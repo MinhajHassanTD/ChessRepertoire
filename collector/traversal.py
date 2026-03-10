@@ -1,153 +1,291 @@
-# collector/traversal.py
-
+from collections import deque
 import chess
-import sqlite3
 from collector.api import query_position
-from collector.config import MIN_GAMES, MIN_MOVE_FREQUENCY, MAX_DEPTH_MOVES
+from collector.database import get_conn
+from collector.config import (
+    MIN_GAMES, MIN_MOVE_FREQ,
+    MIN_DEPTH, MAX_DEPTH,
+    FIRST_MOVES
+)
+
+# ─────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────
+
+def position_key(moves_uci: list[str]) -> str:
+    """Stable string key for a position. Root = 'root'."""
+    return " ".join(moves_uci) if moves_uci else "root"
 
 
-def get_first_move_tag(moves_uci: list[str], board: chess.Board) -> str:
+def get_first_move_tag(moves_uci: list[str]) -> str:
+    """
+    Which opening family does this line belong to?
+    Always determined by White's first move regardless of
+    which color's perspective we are saving.
+    """
     if not moves_uci:
         return "root"
-
-    first = moves_uci[0]
-    mapping = {
-        "e2e4": "e4",
-        "d2d4": "d4",
-        "c2c4": "c4",
-        "g1f3": "Nf3",
-    }
-    return mapping.get(first, "other")
+    return FIRST_MOVES.get(moves_uci[0], "other")
 
 
-def compute_performance_score(white: int, draws: int, black: int, color: str) -> float:
-    total = white + draws + black
+def compute_scores(white_wins: int, draws: int, black_wins: int) -> dict | None:
+    """
+    Compute all metrics from raw counts for BOTH color perspectives.
+    Returns None if total games is zero.
+    """
+    total = white_wins + draws + black_wins
     if total == 0:
-        return 0.0
+        return None
 
-    if color == "white":
-        return (white + 0.5 * draws) / total
-    return (black + 0.5 * draws) / total
+    return {
+        "white_wins":  white_wins,
+        "draws":       draws,
+        "black_wins":  black_wins,
+        "total_games": total,
+
+        # White perspective — higher is better for White
+        "white_perf":      (white_wins + 0.5 * draws) / total,
+        "white_win_rate":  white_wins / total,
+        "white_draw_rate": draws / total,
+        "white_loss_rate": black_wins / total,
+
+        # Black perspective — higher is better for Black
+        "black_perf":      (black_wins + 0.5 * draws) / total,
+        "black_win_rate":  black_wins / total,
+        "black_draw_rate": draws / total,
+        "black_loss_rate": white_wins / total,
+    }
 
 
-def already_visited(color: str, position_key: str, conn) -> bool:
+def is_visited(key: str, conn) -> bool:
     row = conn.execute(
-        "SELECT visited FROM collection_log WHERE color = ? AND position_uci = ?",
-        (color, position_key),
+        "SELECT 1 FROM visited_positions WHERE position_key = ?",
+        (key,)
     ).fetchone()
     return row is not None
 
 
-def log_position(
-    color: str, position_key: str, total_games: int, skipped_reason: str | None, conn
-):
+def mark_visited(key: str, total_games: int, skip_reason: str | None, conn):
     conn.execute(
-        """INSERT OR IGNORE INTO collection_log
-           (color, position_uci, visited, total_games, skipped_reason)
-           VALUES (?, ?, 1, ?, ?)""",
-        (color, position_key, total_games, skipped_reason),
+        """INSERT OR IGNORE INTO visited_positions
+           (position_key, total_games, skip_reason)
+           VALUES (?, ?, ?)""",
+        (key, total_games, skip_reason)
     )
 
 
-def save_line(moves_san: list[str], moves_uci: list[str], board: chess.Board,
-              color: str, api_data: dict, conn):
-    total = api_data["white"] + api_data["draws"] + api_data["black"]
-    fen = board.fen()
+def save_line(moves_san: list[str], moves_uci: list[str],
+              fen: str, scores: dict, color: str, conn):
+    """
+    Save one line from one color's perspective.
+    UNIQUE(final_fen, color) silently rejects transpositions.
+    """
 
-    perf = compute_performance_score(
-        api_data["white"], api_data["draws"], api_data["black"], color
-    )
+    if color == "white":
+        perf      = scores["white_perf"]
+        win_rate  = scores["white_win_rate"]
+        draw_rate = scores["white_draw_rate"]
+        loss_rate = scores["white_loss_rate"]
+    else:
+        perf      = scores["black_perf"]
+        win_rate  = scores["black_win_rate"]
+        draw_rate = scores["black_draw_rate"]
+        loss_rate = scores["black_loss_rate"]
 
     try:
-        conn.execute(
-            """
-            INSERT INTO opening_lines
-            (moves_san, moves_uci, final_fen, color, depth,
-             first_move_tag, win_count, draw_count, loss_count,
-             total_games, win_rate, draw_rate, loss_rate, performance_score)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                " ".join(moves_san),
-                " ".join(moves_uci),
-                fen,
-                color,
-                len(moves_uci),
-                get_first_move_tag(moves_uci, board),
-                api_data["white"],
-                api_data["draws"],
-                api_data["black"],
-                total,
-                api_data["white"] / total if total > 0 else 0,
-                api_data["draws"] / total if total > 0 else 0,
-                api_data["black"] / total if total > 0 else 0,
-                perf,
-            ),
-        )
-        return True
-    except sqlite3.IntegrityError:
-        print(f"  Transposition detected, skipping ({color}): {' '.join(moves_san)}")
-        return False
+        conn.execute("""
+            INSERT INTO opening_lines (
+                moves_san, moves_uci, final_fen, color, depth,
+                first_move_tag,
+                white_wins, draws, black_wins, total_games,
+                performance_score, win_rate, draw_rate, loss_rate
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            " ".join(moves_san),
+            " ".join(moves_uci),
+            fen,
+            color,
+            len(moves_uci),
+            get_first_move_tag(moves_uci),
+            scores["white_wins"],
+            scores["draws"],
+            scores["black_wins"],
+            scores["total_games"],
+            perf,
+            win_rate,
+            draw_rate,
+            loss_rate
+        ))
+
+    except Exception:
+        # UNIQUE constraint fired — transposition, skip silently
+        pass
 
 
-def traverse(moves_uci: list[str], moves_san: list[str],
-             board: chess.Board, color: str, depth: int, conn):
-    position_key = " ".join(moves_uci) if moves_uci else "root"
+# ─────────────────────────────────────────────────────────
+# Main traversal
+# ─────────────────────────────────────────────────────────
 
-    if already_visited(color, position_key, conn):
-        return
+def run_traversal():
+    """
+    Breadth-first traversal of the Lichess opening tree.
 
-    if depth >= MAX_DEPTH_MOVES:
-        log_position(color, position_key, -1, "max_depth_reached", conn)
-        conn.commit()
-        return
+    Single pass — saves both White and Black perspective lines
+    at every qualifying position. No separate white/black runs.
 
-    print(f"  Querying [{color}]: {position_key} (depth {depth})")
-    data = query_position(moves_uci)
+    Resumable — already-visited positions are skipped.
+    """
 
-    if data is None:
-        log_position(color, position_key, -1, "api_error", conn)
-        conn.commit()
-        return
+    conn = get_conn()
 
-    total_games = data["white"] + data["draws"] + data["black"]
+    # Queue holds (moves_uci, moves_san) tuples.
+    # We reconstruct the board from moves on dequeue
+    # rather than storing Board objects in the queue.
+    queue = deque()
+    queue.append(([], []))   # Root: no moves yet
 
-    if total_games < MIN_GAMES:
-        log_position(color, position_key, total_games, "insufficient_games", conn)
-        conn.commit()
-        return
+    processed = 0
+    saved     = 0
+    skipped   = 0
 
-    log_position(color, position_key, total_games, None, conn)
+    print("Starting traversal (breadth-first)...")
+    print(f"  MIN_GAMES={MIN_GAMES}  MIN_MOVE_FREQ={MIN_MOVE_FREQ}"
+          f"  MIN_DEPTH={MIN_DEPTH}  MAX_DEPTH={MAX_DEPTH}\n")
 
-    if depth >= 6:
-        save_line(moves_san, moves_uci, board, color, data, conn)
+    while queue:
 
-    conn.commit()
+        moves_uci, moves_san = queue.popleft()
+        key   = position_key(moves_uci)
+        depth = len(moves_uci)
 
-    for move_data in data.get("moves", []):
-        move_total = move_data["white"] + move_data["draws"] + move_data["black"]
-        if move_total < MIN_GAMES:
+        # ── Already visited ───────────────────────────────
+        if is_visited(key, conn):
             continue
 
-        frequency = move_total / total_games
-        if frequency < MIN_MOVE_FREQUENCY:
+        # ── Hard depth ceiling ────────────────────────────
+        if depth > MAX_DEPTH:
+            mark_visited(key, -1, "max_depth", conn)
+            conn.commit()
             continue
 
-        try:
-            move = chess.Move.from_uci(move_data["uci"])
-            san = board.san(move)
-            board.push(move)
+        # ── Reconstruct board ──────────────────────────────
+        # Done here rather than storing boards in the queue
+        # to keep memory usage flat regardless of queue size
+        board = chess.Board()
+        for uci in moves_uci:
+            board.push(chess.Move.from_uci(uci))
 
-            traverse(
-                moves_uci + [move_data["uci"]],
-                moves_san + [san],
-                board,
-                color,
-                depth + 1,
-                conn,
+        # ── Query Lichess ─────────────────────────────────
+        print(f"  [{processed}] depth={depth:2}  {key or 'root'}")
+        data = query_position(moves_uci)
+        processed += 1
+
+        if data is None:
+            mark_visited(key, -1, "api_error", conn)
+            conn.commit()
+            skipped += 1
+            continue
+
+        total = data["white"] + data["draws"] + data["black"]
+
+        # ── Game count threshold ───────────────────────────
+        if total < MIN_GAMES:
+            mark_visited(key, total, "insufficient_games", conn)
+            conn.commit()
+            skipped += 1
+            continue
+
+        mark_visited(key, total, None, conn)
+
+        # ── Save as line if deep enough ────────────────────
+        # Only save positions that represent genuine preparation.
+        # Positions shallower than MIN_DEPTH are too generic.
+        if depth >= MIN_DEPTH:
+
+            scores = compute_scores(
+                data["white"], data["draws"], data["black"]
             )
 
-            board.pop()
-        except Exception as e:
-            print(f"  Move error {move_data['uci']}: {e}")
-            continue
+            if scores:
+                fen = board.fen()
+
+                # Save White perspective
+                save_line(moves_san, moves_uci, fen,
+                          scores, "white", conn)
+
+                # Save Black perspective
+                # Same moves and board — different performance score
+                save_line(moves_san, moves_uci, fen,
+                          scores, "black", conn)
+
+                saved += 2
+
+        conn.commit()
+
+        # ── Enqueue qualifying children ────────────────────
+        if depth < MAX_DEPTH:
+
+            for move_data in data.get("moves", []):
+
+                child_total = (move_data["white"] +
+                               move_data["draws"] +
+                               move_data["black"])
+
+                # Absolute game count threshold
+                if child_total < MIN_GAMES:
+                    continue
+
+                # Relative frequency threshold
+                frequency = child_total / total
+                if frequency < MIN_MOVE_FREQ:
+                    continue
+
+                try:
+                    move = chess.Move.from_uci(move_data["uci"])
+                    san  = board.san(move)
+                except Exception as e:
+                    print(f"  Move error {move_data['uci']}: {e}")
+                    continue
+
+                queue.append((
+                    moves_uci + [move_data["uci"]],
+                    moves_san + [san]
+                ))
+
+    # ── Summary ───────────────────────────────────────────
+    total_lines = conn.execute(
+        "SELECT COUNT(*) FROM opening_lines"
+    ).fetchone()[0]
+
+    white_count = conn.execute(
+        "SELECT COUNT(*) FROM opening_lines WHERE color='white'"
+    ).fetchone()[0]
+
+    black_count = conn.execute(
+        "SELECT COUNT(*) FROM opening_lines WHERE color='black'"
+    ).fetchone()[0]
+
+    visited_count = conn.execute(
+        "SELECT COUNT(*) FROM visited_positions"
+    ).fetchone()[0]
+
+    skipped_count = conn.execute(
+        "SELECT COUNT(*) FROM visited_positions "
+        "WHERE skip_reason IS NOT NULL"
+    ).fetchone()[0]
+
+    conn.close()
+
+    print(f"""
+{'='*45}
+TRAVERSAL COMPLETE
+{'='*45}
+Positions queried   : {processed}
+Positions skipped   : {skipped}
+Total lines saved   : {total_lines}
+  White lines       : {white_count}
+  Black lines       : {black_count}
+Positions visited   : {visited_count}
+Positions pruned    : {skipped_count}
+{'='*45}
+    """)
