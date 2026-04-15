@@ -21,7 +21,7 @@ LICHESS_API_TOKEN = os.environ["LICHESS_API_TOKEN"]
 
 BASE_URL = "https://explorer.lichess.ovh/lichess"
 RATE_LIMIT_SLEEP = 1.1  # seconds between consecutive API calls
-MAX_PLY_DEPTH = 8
+MAX_PLY_DEPTH = 10
 MIN_MOVE_FREQUENCY = 0.10  # move must be >= 10% of aggregate plays at its position
 
 
