@@ -1,0 +1,8 @@
+python-chess
+numpy
+pandas
+scipy
+matplotlib
+requests
+python-dotenv
+pytest
