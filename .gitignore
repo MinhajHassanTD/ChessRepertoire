@@ -8,3 +8,4 @@ data/*.pkl
 code.md
 .claude/
 .pytest_cache/
+solution.txt

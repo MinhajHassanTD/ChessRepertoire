@@ -92,4 +92,4 @@ if __name__ == "__main__":
         cache = build_eval_cache(g)
         save_eval_cache(cache, out_path)
         print(f"  prior_mean = {cache['prior_mean']:.6f}")
-        print(f"  {len(cache['scores'])} positions cached → {out_path}")
+        print(f"  {len(cache['scores'])} positions cached -> {out_path}")

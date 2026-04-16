@@ -61,7 +61,10 @@ class Candidate:
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 def _our_turn(rep: Repertoire, fen: str) -> bool:
-    return rep.graph["nodes"][fen]["turn"] == rep.color
+    node = rep.graph["nodes"].get(fen)
+    if node is None:
+        return False
+    return node["turn"] == rep.color
 
 
 def _expand_to_closure(rep: Repertoire, frontier: list[str]) -> None:

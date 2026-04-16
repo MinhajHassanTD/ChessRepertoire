@@ -32,7 +32,11 @@ def walk(rep, band: str, eval_cache: dict, base_policies: dict, graph: dict,
     if node_fen is None:
         node_fen = graph["root_fen"]
 
-    node = graph["nodes"][node_fen]
+    node = graph["nodes"].get(node_fen)
+    if node is None:
+        if node_fen in eval_cache["scores"]:
+            return eval_cache["scores"][node_fen][band]
+        return eval_cache["prior_mean"]
     is_our_turn = (node["turn"] == rep.color)
 
     if is_our_turn:

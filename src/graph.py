@@ -179,4 +179,4 @@ if __name__ == "__main__":
         g = build_graph(db, split)
         print(f"  {len(g['nodes'])} nodes")
         save_graph(g, out)
-        print(f"  Saved → {out}")
+        print(f"  Saved -> {out}")
