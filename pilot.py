@@ -51,7 +51,7 @@ BANDS = ["1600-1799", "1800-1999", "2000-2199"]
 
 
 def print_fitness_breakdown(serialized_candidate, graph_train, eval_train, base_policies):
-    """Reconstruct best candidate and print per-color per-band scores."""
+    """Reconstruct best candidate and print per-color per-band scores, separated."""
     sc = serialized_candidate
     white_rep = Repertoire(color="white", committed=sc["white_committed"],
                            reached=set(sc["white_reached"]), graph=graph_train)
@@ -60,19 +60,32 @@ def print_fitness_breakdown(serialized_candidate, graph_train, eval_train, base_
     best = Candidate(white=white_rep, black=black_rep, fitness=None, band_scores_cache=None)
 
     print(f"  {'Band':<13} {'White':>8} {'Black':>8} {'Combined':>10}")
-    print(f"  {'-'*42}")
+    print(f"  {'-'*46}")
+    white_per_band = []
+    black_per_band = []
     combined_per_band = []
     for band in BANDS:
         w = walk(best.white, band, eval_train, base_policies, graph_train)
         b = 1.0 - walk(best.black, band, eval_train, base_policies, graph_train)
         c = 0.5 * w + 0.5 * b
+        white_per_band.append(w)
+        black_per_band.append(b)
         combined_per_band.append(c)
         print(f"  {band:<13} {w:>8.4f} {b:>8.4f} {c:>10.4f}")
+    print(f"  {'-'*46}")
+    mean_w = np.mean(white_per_band)
+    mean_b = np.mean(black_per_band)
     mean_c = np.mean(combined_per_band)
+    cvar_w = min(white_per_band)
+    cvar_b = min(black_per_band)
     cvar   = min(combined_per_band)
-    fitness = mean_c + PILOT_CONFIG["lambda_weight"] * cvar
-    print(f"  {'-'*42}")
-    print(f"  {'mean+CVaR':<13}  mean={mean_c:.4f}  CVaR={cvar:.4f}  fitness={fitness:.4f}")
+    lam = PILOT_CONFIG["lambda_weight"]
+    fit_w = mean_w + lam * cvar_w
+    fit_b = mean_b + lam * cvar_b
+    fitness = mean_c + lam * cvar
+    print(f"  {'White score':<13}  mean={mean_w:.4f}  CVaR={cvar_w:.4f}  fitness={fit_w:.4f}")
+    print(f"  {'Black score':<13}  mean={mean_b:.4f}  CVaR={cvar_b:.4f}  fitness={fit_b:.4f}")
+    print(f"  {'Combined':<13}  mean={mean_c:.4f}  CVaR={cvar:.4f}  fitness={fitness:.4f}")
 
 
 def _rep_lines(rep, graph) -> list[str]:
@@ -158,6 +171,53 @@ def print_subgraphs(serialized_candidate, graph):
         print()
 
 
+def print_repertoire_for_player(serialized_candidate, graph, eval_cache, base_policies, color: str):
+    """Print the move tree and per-band scores for a single player (white or black).
+
+    Use this when a real user only plays one side and wants their personalized
+    opening guide: every line they must know, plus how well it scores at each
+    opponent rating band.
+
+    color: 'white' or 'black'
+    """
+    assert color in ("white", "black"), "color must be 'white' or 'black'"
+    sc = serialized_candidate
+    rep = Repertoire(
+        color=color,
+        committed=sc[f"{color}_committed"],
+        reached=set(sc[f"{color}_reached"]),
+        graph=graph,
+    )
+    committed_n = len(rep.committed)
+    reached_n   = len(rep.reached)
+
+    print(f"  === REPERTOIRE FOR {color.upper()} PLAYER ===")
+    print(f"  Committed moves: {committed_n}   Positions covered: {reached_n}")
+    print()
+
+    # Move tree
+    print("  OPENING LINES  (* = leaf — no further committed move)")
+    print("  " + "-" * 50)
+    for line in _rep_lines(rep, graph):
+        print(f"  {line}")
+    print()
+
+    # Per-band score for this player only
+    print(f"  SCORES BY OPPONENT BAND  (higher = better for {color})")
+    print(f"  {'Band':<13} {'Score':>8}")
+    print(f"  {'-'*24}")
+    scores = []
+    for band in BANDS:
+        ws = walk(rep, band, eval_cache, base_policies, graph)
+        player_score = ws if color == "white" else 1.0 - ws
+        scores.append(player_score)
+        print(f"  {band:<13} {player_score:>8.4f}")
+    print(f"  {'-'*24}")
+    print(f"  {'mean':<13} {np.mean(scores):>8.4f}")
+    print(f"  {'worst band':<13} {min(scores):>8.4f}")
+    print()
+
+
 def compare_results(r1: dict, r2: dict) -> tuple[bool, list[str]]:
     """Compare two run results excluding wall_time_seconds. Return (ok, issues)."""
     issues = []
@@ -238,6 +298,9 @@ def main():
         print(f"  --- Fitness breakdown (train, best candidate) ---")
         print_fitness_breakdown(r1["final_best_candidate"], graph_train, eval_train, base_policies)
         print_subgraphs(r1["final_best_candidate"], graph_train)
+        print(f"  --- Player-specific views ---")
+        print_repertoire_for_player(r1["final_best_candidate"], graph_train, eval_train, base_policies, "white")
+        print_repertoire_for_player(r1["final_best_candidate"], graph_train, eval_train, base_policies, "black")
 
         results[mode] = {"run1": r1, "run2": r2, "reproducible": ok}
 

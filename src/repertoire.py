@@ -48,6 +48,8 @@ class Candidate:
     black: Repertoire
     fitness: Optional[float] = field(default=None)
     band_scores_cache: Optional[dict] = field(default=None)
+    white_band_scores_cache: Optional[dict] = field(default=None)
+    black_band_scores_cache: Optional[dict] = field(default=None)
 
     def copy(self) -> "Candidate":
         return Candidate(
@@ -55,6 +57,8 @@ class Candidate:
             black=self.black.copy(),
             fitness=self.fitness,
             band_scores_cache=copy.deepcopy(self.band_scores_cache),
+            white_band_scores_cache=copy.deepcopy(self.white_band_scores_cache),
+            black_band_scores_cache=copy.deepcopy(self.black_band_scores_cache),
         )
 
 
@@ -577,6 +581,8 @@ def mutate_candidate(candidate: Candidate, rng) -> Candidate:
     new_cand = candidate.copy()
     new_cand.fitness = None
     new_cand.band_scores_cache = None
+    new_cand.white_band_scores_cache = None
+    new_cand.black_band_scores_cache = None
 
     for _ in range(5):
         color = rng.choice(["white", "black"])
@@ -596,6 +602,8 @@ def mutate_candidate(candidate: Candidate, rng) -> Candidate:
     clone = candidate.copy()
     clone.fitness = None
     clone.band_scores_cache = None
+    clone.white_band_scores_cache = None
+    clone.black_band_scores_cache = None
     return clone
 
 
@@ -614,4 +622,5 @@ def crossover_candidates(cand_a: Candidate, cand_b: Candidate, rng) -> Candidate
     except MutationFailed:
         new_black = cand_a.black.copy()
 
-    return Candidate(white=new_white, black=new_black, fitness=None, band_scores_cache=None)
+    return Candidate(white=new_white, black=new_black, fitness=None,
+                     band_scores_cache=None, white_band_scores_cache=None, black_band_scores_cache=None)

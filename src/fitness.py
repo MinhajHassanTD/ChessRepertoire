@@ -94,17 +94,25 @@ def evaluate(
     # Compute per-band scores (cached on candidate for shared sampling)
     if use_cache and candidate.band_scores_cache is not None:
         band_scores = candidate.band_scores_cache
+        white_band_scores = candidate.white_band_scores_cache
+        black_band_scores = candidate.black_band_scores_cache
     else:
         band_scores = {}
+        white_band_scores = {}
+        black_band_scores = {}
         for band in BANDS:
             white_ws = walk(candidate.white, band, eval_cache, base_policies, graph)
             black_ws = walk(candidate.black, band, eval_cache, base_policies, graph)
             # White walk: White-perspective score directly
             # Black walk: White-perspective score; convert for Black player
             black_score_for_player = 1.0 - black_ws
+            white_band_scores[band] = white_ws
+            black_band_scores[band] = black_score_for_player
             band_scores[band] = 0.5 * white_ws + 0.5 * black_score_for_player
         if use_cache:
             candidate.band_scores_cache = band_scores
+            candidate.white_band_scores_cache = white_band_scores
+            candidate.black_band_scores_cache = black_band_scores
 
     # Mean weighted by opponent mixture
     mean_score = sum(
@@ -122,6 +130,8 @@ def evaluate(
         "cvar": cvar,
         "fitness": fitness,
         "band_scores": dict(band_scores),
+        "white_band_scores": dict(white_band_scores),
+        "black_band_scores": dict(black_band_scores),
     }
 
 
@@ -167,6 +177,8 @@ def evaluate_heldout(
             self.black = black
             self.fitness = None
             self.band_scores_cache = None
+            self.white_band_scores_cache = None
+            self.black_band_scores_cache = None
 
     heldout_cand = _HeldoutCandidate(white_rep, black_rep)
 
