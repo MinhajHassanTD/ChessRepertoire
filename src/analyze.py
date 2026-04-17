@@ -358,29 +358,29 @@ def run_analysis(runs_dir: str = "runs", results_dir: str = "results") -> None:
     """
     Path(results_dir).mkdir(parents=True, exist_ok=True)
 
-    print(f"Loading runs from '{runs_dir}' …")
+    print(f"Loading runs from '{runs_dir}' ...")
     runs = load_runs(runs_dir)
     print(f"  {len(runs)} run(s) loaded.\n")
 
     # 1. Main table
-    print("Computing main_table.csv …")
+    print("Computing main_table.csv ...")
     main_df = compute_main_table(runs)
     main_df.to_csv(os.path.join(results_dir, "main_table.csv"), index=False)
     print(main_df.to_string(index=False))
 
     # 2. Convergence plot
-    print("\nPlotting convergence.png …")
+    print("\nPlotting convergence.png ...")
     plot_convergence(runs, os.path.join(results_dir, "convergence.png"))
     print("  saved.")
 
     # 3. Sensitivity table
-    print("\nComputing sensitivity_table.csv …")
+    print("\nComputing sensitivity_table.csv ...")
     sens_df = compute_sensitivity_table(runs)
     sens_df.to_csv(os.path.join(results_dir, "sensitivity_table.csv"), index=False)
     print(sens_df.to_string(index=False))
 
     # 4. Diagnostic table
-    print("\nComputing diagnostic_table.csv …")
+    print("\nComputing diagnostic_table.csv ...")
     diag_df = compute_diagnostic_table(runs)
     diag_df.to_csv(os.path.join(results_dir, "diagnostic_table.csv"), index=False)
     print(diag_df.to_string(index=False))
