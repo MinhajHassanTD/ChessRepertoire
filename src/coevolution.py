@@ -344,7 +344,7 @@ def run_coevolution(
         rep_diversity = _mean_pairwise_distance(last_evaluated_r_pop)
 
         # ── Step 3: repertoire reproduction ───────────────────────────────────
-        if use_nsga2 and mode == "COEVOLVE":
+        if use_nsga2:
             # Build offspring (same size as parent pop).
             offspring: list[Candidate] = []
             for _ in range(pop_size_r):

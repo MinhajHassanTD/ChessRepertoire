@@ -35,6 +35,7 @@ from src.fitness import BANDS, walk
 METHODS_MAIN = [
     "most_played_baseline",
     "STATIC",
+    "STATIC_DIV",
     "COEVOLVE_FROZEN",
     "COEVOLVE",
     "COEVOLVE_B",
@@ -43,6 +44,7 @@ METHODS_MAIN = [
 ]
 NON_STATIC_METHODS = [
     "most_played_baseline",
+    "STATIC_DIV",
     "COEVOLVE_FROZEN",
     "COEVOLVE",
     "COEVOLVE_B",
@@ -72,6 +74,7 @@ _ADVERSARIAL_QUANTILE = 0.10          # lower tail: pessimistic mixture realizat
 
 _CONVERGENCE_COLORS = {
     "STATIC": "steelblue",
+    "STATIC_DIV": "teal",
     "COEVOLVE_FROZEN": "darkorange",
     "COEVOLVE": "forestgreen",
     "COEVOLVE_B": "crimson",

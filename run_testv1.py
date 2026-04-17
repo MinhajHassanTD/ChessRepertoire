@@ -16,6 +16,7 @@ from src.eval_cache import load_eval_cache
 from src.experiments import (
     PATH_C_EXPERIMENTS,
     PATH_D_EXPERIMENTS,
+    PATH_E_EXPERIMENTS,
     run_filename,
 )
 from src.graph import load_graph
@@ -56,8 +57,9 @@ def _run_subset(experiments: list, data_dir: str = "data", runs_dir: str = "runs
             "use_nsga2": run.get("use_nsga2", False),
             "max_perturbations": run.get("max_perturbations", 30),
         }
+        coevolve_mode = "STATIC" if method == "STATIC_DIV" else "COEVOLVE"
         result = run_coevolution(
-            mode="COEVOLVE",
+            mode=coevolve_mode,
             config=config,
             seed=seed,
             graph_train=graph_train,
@@ -86,10 +88,12 @@ def main() -> None:
     which = sys.argv[2] if len(sys.argv) > 2 else "both"
 
     experiments: list = []
-    if which in ("both", "C"):
+    if which in ("both", "all", "C"):
         experiments += PATH_C_EXPERIMENTS[:n_seeds]
-    if which in ("both", "D"):
+    if which in ("both", "all", "D"):
         experiments += PATH_D_EXPERIMENTS[:n_seeds]
+    if which in ("all", "E"):
+        experiments += PATH_E_EXPERIMENTS[:n_seeds]
 
     _run_subset(experiments)
     print("All testv1 runs complete.")

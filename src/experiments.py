@@ -83,6 +83,22 @@ PATH_D_EXPERIMENTS = [
 
 TESTV1_EXPERIMENTS = PATH_C_EXPERIMENTS + PATH_D_EXPERIMENTS
 
+# Path E: STATIC opponent (no co-evolution) + NSGA-II diversity preservation.
+# Isolates the effect of NSGA-II alone — if COEVOLVE_D > STATIC_DIV, then
+# the adversarial evolution part (not diversity preservation alone) is
+# responsible for the improvement.
+PATH_E_EXPERIMENTS = [
+    {
+        'method': 'STATIC_DIV',
+        'seed': seed,
+        'lambda_weight': 1.0,
+        'alpha': 1 / 3,
+        'use_perturbations': False,
+        'use_nsga2': True,
+    }
+    for seed in range(1000, 1015)
+]
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -235,7 +251,7 @@ def run_all(
             coevolve_mode = (
                 'COEVOLVE'
                 if method in ('COEVOLVE_B', 'COEVOLVE_C', 'COEVOLVE_D')
-                else method
+                else ('STATIC' if method == 'STATIC_DIV' else method)
             )
             config = {
                 'lambda_weight': lam,
@@ -256,7 +272,7 @@ def run_all(
                 eval_cache_train=eval_cache_train,
                 eval_cache_heldout=eval_cache_heldout,
             )
-            if method in ('COEVOLVE_B', 'COEVOLVE_C', 'COEVOLVE_D'):
+            if method in ('COEVOLVE_B', 'COEVOLVE_C', 'COEVOLVE_D', 'STATIC_DIV'):
                 result['mode'] = method
 
         with open(out_path, 'wb') as fh:
