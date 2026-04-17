@@ -150,7 +150,7 @@ def run_all(
     check_clean_git()
 
     # Load all shared data once ─ never reload per run
-    print("Loading data files …")
+    print("Loading data files ...")
     graph_train = load_graph(os.path.join(data_dir, 'graph_train.pkl'))
     graph_heldout = load_graph(os.path.join(data_dir, 'graph_heldout.pkl'))
     base_policies_train = load_policies(os.path.join(data_dir, 'base_policies.pkl'))
@@ -206,7 +206,7 @@ def run_all(
             pickle.dump(result, fh)
 
         completed += 1
-        print(f"          → saved  {out_path}  (heldout={result['heldout_score']:.4f})")
+        print(f"          -> saved  {out_path}  (heldout={result['heldout_score']:.4f})")
 
     print(f"\nFinished: {completed}/{total} runs.")
 
