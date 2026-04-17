@@ -32,8 +32,23 @@ from src.fitness import BANDS, walk
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-METHODS_MAIN = ["most_played_baseline", "STATIC", "COEVOLVE_FROZEN", "COEVOLVE", "COEVOLVE_B"]
-NON_STATIC_METHODS = ["most_played_baseline", "COEVOLVE_FROZEN", "COEVOLVE", "COEVOLVE_B"]
+METHODS_MAIN = [
+    "most_played_baseline",
+    "STATIC",
+    "COEVOLVE_FROZEN",
+    "COEVOLVE",
+    "COEVOLVE_B",
+    "COEVOLVE_C",
+    "COEVOLVE_D",
+]
+NON_STATIC_METHODS = [
+    "most_played_baseline",
+    "COEVOLVE_FROZEN",
+    "COEVOLVE",
+    "COEVOLVE_B",
+    "COEVOLVE_C",
+    "COEVOLVE_D",
+]
 MAIN_SEEDS = range(1000, 1015)   # 15 seeds
 SENS_SEEDS = range(2000, 2005)   # 5 seeds
 MAIN_LAMBDA = 1.0
@@ -41,10 +56,11 @@ SENSITIVITY_LAMBDAS = [0.0, 1.0, 2.0]
 
 # Metrics reported in the main table (Path A multi-metric robustness view)
 HELDOUT_METRICS = [
-    "heldout_uniform_mean",     # mean score under uniform mixture (λ-free)
-    "heldout_worst_band",       # min over 3 bands (pure robustness / CVaR α=1/3)
-    "heldout_adversarial_q10",  # 10th-pct mean score over 200 Dirichlet mixtures
-    "heldout_uniform_fitness",  # mean + λ·cvar under uniform (legacy heldout_score)
+    "heldout_uniform_mean",              # mean score under uniform mixture (λ-free)
+    "heldout_worst_band",                # min over 3 bands (pure robustness / CVaR α=1/3)
+    "heldout_adversarial_q10",           # 10th-pct mean score over 200 Dirichlet mixtures
+    "heldout_uniform_fitness",           # mean + λ·cvar under uniform (legacy heldout_score)
+    "heldout_adversarial_coevolved",     # testv1: worst fitness found by a small adversarial GA on held-out
 ]
 
 # Seed for the Dirichlet samples used in adversarial metric — fixed so the
@@ -59,6 +75,8 @@ _CONVERGENCE_COLORS = {
     "COEVOLVE_FROZEN": "darkorange",
     "COEVOLVE": "forestgreen",
     "COEVOLVE_B": "crimson",
+    "COEVOLVE_C": "mediumorchid",
+    "COEVOLVE_D": "saddlebrown",
 }
 
 
@@ -219,6 +237,8 @@ def _compute_heldout_metrics(
         "heldout_adversarial_q10":  adversarial_q10,
         "heldout_uniform_fitness":  uniform_fitness,
     }
+    # Note: heldout_adversarial_coevolved is produced by run_coevolution itself
+    # and surfaced through _scores_by_seed_metric below.
 
 
 def _load_heldout_artifacts(data_dir: str = "data"):
@@ -256,9 +276,18 @@ def _augment_runs_with_metrics(runs: list[dict], data_dir: str = "data") -> None
 def _scores_by_seed_metric(runs: list[dict], metric: str) -> dict[int, float]:
     """{seed: metric_value} for a pre-filtered run list.  Falls back to the
     legacy scalar heldout_score if metric == 'heldout_uniform_fitness' and no
-    heldout_metrics dict is present (should not happen after augmentation)."""
+    heldout_metrics dict is present (should not happen after augmentation).
+
+    The testv1 metric `heldout_adversarial_coevolved` is stored at the top
+    level of the run dict (produced by run_coevolution), so we read it directly.
+    Runs that predate the metric are silently skipped.
+    """
     out: dict[int, float] = {}
     for r in runs:
+        if metric == "heldout_adversarial_coevolved":
+            if "heldout_adversarial_coevolved" in r:
+                out[r["seed"]] = r["heldout_adversarial_coevolved"]
+            continue
         hm = r.get("heldout_metrics")
         if hm is not None and metric in hm:
             out[r["seed"]] = hm[metric]
@@ -376,7 +405,7 @@ def plot_convergence(runs: list[dict], out_path: str) -> None:
     """
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    for m in ["STATIC", "COEVOLVE_FROZEN", "COEVOLVE", "COEVOLVE_B"]:
+    for m in ["STATIC", "COEVOLVE_FROZEN", "COEVOLVE", "COEVOLVE_B", "COEVOLVE_C", "COEVOLVE_D"]:
         m_runs = [
             r for r in _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
             if r["history"]
@@ -455,7 +484,7 @@ def compute_diagnostic_table(runs: list[dict]) -> pd.DataFrame:
         repertoire_diversity, opponent_diversity, hof_size.
     """
     rows = []
-    for variant in ["COEVOLVE", "COEVOLVE_B"]:
+    for variant in ["COEVOLVE", "COEVOLVE_B", "COEVOLVE_C", "COEVOLVE_D"]:
         variant_runs = [
             r for r in _select(
                 runs, mode=variant, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA
@@ -469,6 +498,8 @@ def compute_diagnostic_table(runs: list[dict]) -> pd.DataFrame:
             rep_divs:  list[float] = []
             opp_divs:  list[float] = []
             hof_sizes: list[float] = []
+            hof_informs: list[float] = []
+            opp_perts:   list[float] = []
             for r in variant_runs:
                 if g >= len(r["history"]):
                     continue
@@ -477,12 +508,18 @@ def compute_diagnostic_table(runs: list[dict]) -> pd.DataFrame:
                 if h["opponent_diversity"] is not None:
                     opp_divs.append(h["opponent_diversity"])
                 hof_sizes.append(float(h["hof_size"]))
+                if h.get("hof_mean_informativeness") is not None:
+                    hof_informs.append(float(h["hof_mean_informativeness"]))
+                if h.get("opp_mean_perturbations") is not None:
+                    opp_perts.append(float(h["opp_mean_perturbations"]))
             rows.append({
-                "variant":              variant,
-                "gen":                  g,
-                "repertoire_diversity": float(np.mean(rep_divs)) if rep_divs else float("nan"),
-                "opponent_diversity":   float(np.mean(opp_divs)) if opp_divs else float("nan"),
-                "hof_size":             float(np.mean(hof_sizes)) if hof_sizes else float("nan"),
+                "variant":                 variant,
+                "gen":                     g,
+                "repertoire_diversity":    float(np.mean(rep_divs)) if rep_divs else float("nan"),
+                "opponent_diversity":      float(np.mean(opp_divs)) if opp_divs else float("nan"),
+                "hof_size":                float(np.mean(hof_sizes)) if hof_sizes else float("nan"),
+                "hof_mean_informativeness": float(np.mean(hof_informs)) if hof_informs else float("nan"),
+                "opp_mean_perturbations":   float(np.mean(opp_perts)) if opp_perts else float("nan"),
             })
 
     return pd.DataFrame(rows)

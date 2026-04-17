@@ -54,6 +54,35 @@ PATH_B_EXPERIMENTS = [
     for seed in range(1000, 1015)
 ]  # 15 seeds — main comparison only
 
+# testv1: Tier 1 only (richer opponent space — per-position perturbations).
+PATH_C_EXPERIMENTS = [
+    {
+        'method': 'COEVOLVE_C',
+        'seed': seed,
+        'lambda_weight': 1.0,
+        'alpha': 1 / 3,
+        'use_perturbations': True,
+        'max_perturbations': 30,
+    }
+    for seed in range(1000, 1015)
+]
+
+# testv1: Tier 1 + Tier 2 (richer opponents + NSGA-II diversity preservation).
+PATH_D_EXPERIMENTS = [
+    {
+        'method': 'COEVOLVE_D',
+        'seed': seed,
+        'lambda_weight': 1.0,
+        'alpha': 1 / 3,
+        'use_perturbations': True,
+        'max_perturbations': 30,
+        'use_nsga2': True,
+    }
+    for seed in range(1000, 1015)
+]
+
+TESTV1_EXPERIMENTS = PATH_C_EXPERIMENTS + PATH_D_EXPERIMENTS
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -201,14 +230,21 @@ def run_all(
                 eval_cache_heldout,
             )
         else:
-            # COEVOLVE_B is COEVOLVE with extra config keys; run as COEVOLVE
-            # and relabel afterward so the file is uniquely named.
-            coevolve_mode = 'COEVOLVE' if method == 'COEVOLVE_B' else method
+            # COEVOLVE_B/C/D are COEVOLVE with extra config keys; run as COEVOLVE
+            # and relabel afterward so each file is uniquely named.
+            coevolve_mode = (
+                'COEVOLVE'
+                if method in ('COEVOLVE_B', 'COEVOLVE_C', 'COEVOLVE_D')
+                else method
+            )
             config = {
                 'lambda_weight': lam,
                 'alpha': run['alpha'],
                 'novelty_weight': run.get('novelty_weight', 0.1),
                 'hof_size': run.get('hof_size', 5),
+                'use_perturbations': run.get('use_perturbations', False),
+                'use_nsga2': run.get('use_nsga2', False),
+                'max_perturbations': run.get('max_perturbations', 30),
             }
             result = run_coevolution(
                 mode=coevolve_mode,
@@ -220,8 +256,8 @@ def run_all(
                 eval_cache_train=eval_cache_train,
                 eval_cache_heldout=eval_cache_heldout,
             )
-            if method == 'COEVOLVE_B':
-                result['mode'] = 'COEVOLVE_B'
+            if method in ('COEVOLVE_B', 'COEVOLVE_C', 'COEVOLVE_D'):
+                result['mode'] = method
 
         with open(out_path, 'wb') as fh:
             pickle.dump(result, fh)
