@@ -40,6 +40,20 @@ SENSITIVITY_EXPERIMENTS = [
 
 ALL_EXPERIMENTS = MAIN_EXPERIMENTS + SENSITIVITY_EXPERIMENTS  # 90 runs total
 
+# Path B ablation: COEVOLVE with increased novelty pressure and larger HoF.
+# Method label 'COEVOLVE_B' keeps files separate from the original COEVOLVE runs.
+PATH_B_EXPERIMENTS = [
+    {
+        'method': 'COEVOLVE_B',
+        'seed': seed,
+        'lambda_weight': 1.0,
+        'alpha': 1 / 3,
+        'novelty_weight': 0.5,   # was 0.1 in original COEVOLVE
+        'hof_size': 15,          # was 5 in original COEVOLVE
+    }
+    for seed in range(1000, 1015)
+]  # 15 seeds — main comparison only
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -187,12 +201,17 @@ def run_all(
                 eval_cache_heldout,
             )
         else:
+            # COEVOLVE_B is COEVOLVE with extra config keys; run as COEVOLVE
+            # and relabel afterward so the file is uniquely named.
+            coevolve_mode = 'COEVOLVE' if method == 'COEVOLVE_B' else method
             config = {
                 'lambda_weight': lam,
                 'alpha': run['alpha'],
+                'novelty_weight': run.get('novelty_weight', 0.1),
+                'hof_size': run.get('hof_size', 5),
             }
             result = run_coevolution(
-                mode=method,
+                mode=coevolve_mode,
                 config=config,
                 seed=seed,
                 graph_train=graph_train,
@@ -201,6 +220,8 @@ def run_all(
                 eval_cache_train=eval_cache_train,
                 eval_cache_heldout=eval_cache_heldout,
             )
+            if method == 'COEVOLVE_B':
+                result['mode'] = 'COEVOLVE_B'
 
         with open(out_path, 'wb') as fh:
             pickle.dump(result, fh)

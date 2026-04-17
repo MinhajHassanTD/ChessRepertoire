@@ -273,9 +273,10 @@ def run_coevolution(
 
                 exploitation = -float(np.mean(rep_scores))
 
+                novelty_weight: float = float(config.get("novelty_weight", 0.1))
                 other_mixtures = [o.mixture for o in O_pop if o is not opp]
                 if other_mixtures:
-                    novelty = 0.1 * float(
+                    novelty = novelty_weight * float(
                         np.mean([np.linalg.norm(opp.mixture - m) for m in other_mixtures])
                     )
                 else:
