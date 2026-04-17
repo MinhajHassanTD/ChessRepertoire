@@ -106,12 +106,12 @@ def _select(
     """Filter runs by mode, seed set, and lambda_weight."""
     out = []
     for r in runs:
-        if mode is not None and r["mode"] != mode:
+        if mode is not None and r.get("mode") != mode:
             continue
-        if seeds is not None and r["seed"] not in seeds:
+        if seeds is not None and r.get("seed") not in seeds:
             continue
         if lambda_weight is not None:
-            if r["config"].get("lambda_weight") != lambda_weight:
+            if r.get("config", {}).get("lambda_weight") != lambda_weight:
                 continue
         out.append(r)
     return out
