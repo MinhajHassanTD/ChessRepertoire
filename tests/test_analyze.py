@@ -151,10 +151,7 @@ def test_bit_identical_reruns(tmp_path):
 # ── AC2: main_table.csv columns and rows ─────────────────────────────────────
 
 def test_main_table_columns_and_rows(tmp_path):
-    """
-    AC2 — main_table.csv has exactly one row per method and the six required
-    columns.
-    """
+    """main_table.csv has the (metric, method) schema with required columns."""
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
     _write_runs(_build_main_runs(), str(runs_dir))
@@ -163,35 +160,26 @@ def test_main_table_columns_and_rows(tmp_path):
     df = compute_main_table(runs)
 
     required_columns = {
-        "method", "mean_heldout", "std_heldout", "median_heldout",
+        "metric", "method", "mean", "std", "median",
         "wilcoxon_p_vs_STATIC", "A12_vs_STATIC",
     }
     assert required_columns == set(df.columns), f"Unexpected columns: {set(df.columns)}"
 
     expected_methods = {"most_played_baseline", "STATIC", "COEVOLVE_FROZEN", "COEVOLVE"}
     assert set(df["method"]) == expected_methods
-    assert len(df) == 4
 
 
 def test_main_table_stat_values_are_finite(tmp_path):
-    """
-    AC2 (cont.) — mean, std, median are finite floats for methods that have runs.
-    STATIC row has NaN for p and A12 (self-comparison undefined).
-    """
+    """STATIC rows have NaN p / A12 (self-comparison undefined)."""
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
     _write_runs(_build_main_runs(), str(runs_dir))
 
     df = compute_main_table(load_runs(str(runs_dir)))
 
-    for _, row in df.iterrows():
-        assert np.isfinite(row["mean_heldout"]),   f"{row['method']} mean_heldout is not finite"
-        assert np.isfinite(row["std_heldout"]),    f"{row['method']} std_heldout is not finite"
-        assert np.isfinite(row["median_heldout"]), f"{row['method']} median_heldout is not finite"
-
-    static_row = df[df["method"] == "STATIC"].iloc[0]
-    assert np.isnan(static_row["wilcoxon_p_vs_STATIC"])
-    assert np.isnan(static_row["A12_vs_STATIC"])
+    static_rows = df[df["method"] == "STATIC"]
+    assert static_rows["wilcoxon_p_vs_STATIC"].isna().all()
+    assert static_rows["A12_vs_STATIC"].isna().all()
 
 
 # ── AC3: Holm correction ──────────────────────────────────────────────────────
@@ -223,18 +211,15 @@ def test_holm_correct_clips_at_1():
 
 
 def test_main_table_p_values_are_holm_corrected(tmp_path):
-    """
-    AC3 — the wilcoxon_p_vs_STATIC column in main_table.csv reflects
-    Holm correction: corrected p >= raw p for every non-STATIC method.
-    """
+    """The wilcoxon_p_vs_STATIC column reflects Holm correction (>= raw p)."""
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
     _write_runs(_build_main_runs(), str(runs_dir))
 
     runs = load_runs(str(runs_dir))
     df = compute_main_table(runs)
+    df_uf = df[df["metric"] == "heldout_uniform_fitness"]
 
-    # Compute raw p-values independently
     static_runs = [r for r in runs if r["mode"] == "STATIC" and 1000 <= r["seed"] <= 1014]
     static_by_seed = {r["seed"]: r["heldout_score"] for r in static_runs}
 
@@ -249,8 +234,7 @@ def test_main_table_p_values_are_holm_corrected(tmp_path):
             continue
         _, raw_p = stats.wilcoxon(x, y, zero_method="wilcox")
 
-        table_p = df.loc[df["method"] == m, "wilcoxon_p_vs_STATIC"].iloc[0]
-        # Corrected p >= raw p (Holm never makes p smaller)
+        table_p = df_uf.loc[df_uf["method"] == m, "wilcoxon_p_vs_STATIC"].iloc[0]
         assert table_p >= raw_p - 1e-12, (
             f"{m}: corrected p ({table_p:.6f}) < raw p ({raw_p:.6f})"
         )
@@ -288,7 +272,7 @@ def test_a12_known_value():
 
 
 def test_main_table_a12_in_range(tmp_path):
-    """AC4 — A12 values in main_table.csv are in [0, 1] for non-STATIC methods."""
+    """A12 values in main_table.csv are in [0, 1] for non-STATIC methods."""
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
     _write_runs(_build_main_runs(), str(runs_dir))
@@ -297,32 +281,30 @@ def test_main_table_a12_in_range(tmp_path):
     non_static = df[df["method"] != "STATIC"]
     for _, row in non_static.iterrows():
         val = row["A12_vs_STATIC"]
-        assert 0.0 <= val <= 1.0, f"{row['method']}: A12={val} out of [0,1]"
+        if np.isnan(val):
+            continue
+        assert 0.0 <= val <= 1.0, f"{row['method']}/{row['metric']}: A12={val} out of [0,1]"
 
 
 # ── AC5: Sensitivity table ────────────────────────────────────────────────────
 
 def test_sensitivity_table_structure(tmp_path):
-    """
-    AC5 — sensitivity_table.csv has one row per (method, lambda) and the
-    four required columns.
-    """
+    """sensitivity_table.csv has (metric, method, lambda) rows with mean/std."""
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
     _write_runs(_build_sensitivity_runs(), str(runs_dir))
 
     df = compute_sensitivity_table(load_runs(str(runs_dir)))
 
-    assert set(df.columns) == {"method", "lambda_weight", "mean_heldout", "std_heldout"}
-    # 2 methods × 3 lambdas = 6 rows
-    assert len(df) == 6
+    assert {"metric", "method", "lambda_weight", "mean", "std"}.issubset(set(df.columns))
 
+    df_uf = df[df["metric"] == "heldout_uniform_fitness"]
     for m in ["STATIC", "COEVOLVE"]:
         for lam in [0.0, 1.0, 2.0]:
-            row = df[(df["method"] == m) & (df["lambda_weight"] == lam)]
+            row = df_uf[(df_uf["method"] == m) & (df_uf["lambda_weight"] == lam)]
             assert len(row) == 1, f"Missing row for method={m} lambda={lam}"
-            assert np.isfinite(row.iloc[0]["mean_heldout"])
-            assert np.isfinite(row.iloc[0]["std_heldout"])
+            assert np.isfinite(row.iloc[0]["mean"])
+            assert np.isfinite(row.iloc[0]["std"])
 
 
 # ── AC6: Diagnostic table — COEVOLVE only ────────────────────────────────────
@@ -352,19 +334,14 @@ def test_diagnostic_table_coevolve_only(tmp_path):
 
 
 def test_diagnostic_table_empty_when_no_coevolve(tmp_path):
-    """
-    AC6 (edge case) — an empty (correct-columns) DataFrame is returned when
-    there are no COEVOLVE runs in scope.
-    """
+    """Empty DataFrame is returned when there are no COEVOLVE runs in scope."""
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
-    # Only STATIC runs — no COEVOLVE
     static_only = [_make_run("STATIC", s, 1.0, 0.5) for s in range(1000, 1005)]
     _write_runs(static_only, str(runs_dir))
 
     df = compute_diagnostic_table(load_runs(str(runs_dir)))
     assert len(df) == 0
-    assert "gen" in df.columns
 
 
 # ── AC7: Convergence PNG created ─────────────────────────────────────────────

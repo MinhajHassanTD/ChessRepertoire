@@ -17,8 +17,7 @@
 7. [Running the Pipeline](#7-running-the-pipeline)
 8. [Component Reference](#8-component-reference)
 9. [Fixed Parameters](#9-fixed-parameters)
-10. [Pilot Results](#10-pilot-results)
-11. [Interpreting Output](#11-interpreting-output)
+10. [Interpreting Output](#10-interpreting-output)
 
 ---
 
@@ -134,12 +133,12 @@ Two parent repertoires share a **pivot position** — a node where both have com
 ChessRepertoire/
 |-- BLUEPRINT.md              <- source of truth for all design decisions
 |-- README.md                 <- this file
-|-- solution.txt              <- concise implementation summary
 |-- requirements.txt          <- Python dependencies
 |-- .env.example              <- template for Lichess API token
 |-- .gitignore
 |
-|-- pilot.py                  <- end-to-end smoke test (pop=10, gen=5)
+|-- paper/
+|   `-- draft.md              <- paper draft
 |
 |-- data/
 |   |-- L2.db                 <- SQLite snapshot (C1 output, main database)
@@ -162,16 +161,9 @@ ChessRepertoire/
 |   |-- experiments.py        <- C9: full experimental runs
 |   `-- analyze.py            <- C10: results analysis + figures
 |
-|-- runs/
-|   |-- pilot_results.pkl     <- pilot run output (binary)
-|   `-- pilot_output.txt      <- pilot run printed output (human-readable)
-|
+|-- runs/                     <- per-run pickles (gitignored)
 |-- results/                  <- generated figures and tables (C10)
-`-- tests/
-    |-- test_graph.py
-    |-- test_repertoire.py
-    |-- test_fitness.py
-    `-- test_coevolution.py
+`-- tests/                    <- pytest suite (one file per component)
 ```
 
 ---
@@ -284,15 +276,7 @@ Outputs: `data/eval_cache_train.pkl`, `data/eval_cache_heldout.pkl`
 
 Prints `prior_mean` (~0.52, reflecting White's first-move advantage).
 
-### Step 5 — Run smoke test (pilot)
-
-```bash
-python pilot.py
-```
-
-Runs all three modes with a small population (10 repertoires, 5 generations, seed 42). Checks reproducibility: same seed must give bit-identical results. Saves human-readable output to `runs/pilot_output.txt` and binary data to `runs/pilot_results.pkl`.
-
-### Step 6 — Full experiments (C9)
+### Step 5 — Full experiments (C9)
 
 ```bash
 python src/experiments.py
@@ -304,7 +288,7 @@ Runs 90 total experiments:
 
 Each GA run: 50 generations, 30 repertoires. Resumable — skips runs whose output file already exists. Saves results to `runs/`.
 
-### Step 7 — Analyze results (C10)
+### Step 6 — Analyze results (C10)
 
 ```bash
 python src/analyze.py
@@ -550,21 +534,7 @@ The `final_best_candidate` is serialized as:
 
 ---
 
-## 10. Pilot Results
-
-Smoke test: pop=10, generations=5, seed=42. All three modes reproduce bit-identically.
-
-| Mode | Training Fitness | Held-out Score | Reproducible |
-|---|---|---|---|
-| STATIC | ~1.005 | ~1.005 | PASS |
-| COEVOLVE_FROZEN | ~1.009 | ~1.007 | PASS |
-| COEVOLVE | ~1.009 | ~1.007 | PASS |
-
-Full output (move trees, per-band breakdowns, timing) is saved to `runs/pilot_output.txt` after every run of `pilot.py`.
-
----
-
-## 11. Interpreting Output
+## 10. Interpreting Output
 
 ### Fitness > 1.0 — is that right?
 
