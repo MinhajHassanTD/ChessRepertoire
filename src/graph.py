@@ -172,7 +172,7 @@ if __name__ == "__main__":
     import sys
     import os
 
-    db = sys.argv[1] if len(sys.argv) > 1 else "data/L2.db"
+    db = sys.argv[1] if len(sys.argv) > 1 else "data/snapshot.db"
 
     for split, out in [("train", "data/graph_train.pkl"), ("heldout", "data/graph_heldout.pkl")]:
         print(f"Building {split} graph …", flush=True)

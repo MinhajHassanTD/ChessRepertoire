@@ -3,7 +3,7 @@ Unit tests for C4 — Evaluation cache (src/eval_cache.py).
 
 Each test corresponds to one acceptance criterion from Section E of BLUEPRINT.md.
 Tests build a minimal in-memory graph so they run without any data files.
-One integration test uses L2.db if it is present.
+One integration test uses snapshot.db if it is present.
 """
 
 import os
@@ -184,11 +184,11 @@ def test_save_load_roundtrip(simple_graph):
         os.unlink(path)
 
 
-# ── Integration: build from L2.db if available ───────────────────────────────
+# ── Integration: build from snapshot.db if available ───────────────────────────────
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "L2.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "snapshot.db")
 
-@pytest.mark.skipif(not os.path.exists(DB_PATH), reason="L2.db not present")
+@pytest.mark.skipif(not os.path.exists(DB_PATH), reason="snapshot.db not present")
 def test_integration_all_positions_covered():
     """Integration — every graph node has a cache entry for every band."""
     from src.graph import build_graph
@@ -201,7 +201,7 @@ def test_integration_all_positions_covered():
                 assert band in cache["scores"][fen]
 
 
-@pytest.mark.skipif(not os.path.exists(DB_PATH), reason="L2.db not present")
+@pytest.mark.skipif(not os.path.exists(DB_PATH), reason="snapshot.db not present")
 def test_integration_prior_mean_reasonable():
     """Integration — prior_mean should be near 0.5 (White's slight advantage)."""
     from src.graph import build_graph

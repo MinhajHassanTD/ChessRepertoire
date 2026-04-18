@@ -107,12 +107,14 @@ An opponent is a 3-simplex weight vector over rating bands. `STATIC` uses one fr
 
 | Method              | Mean   | Std    | Wilcoxon p vs. STATIC | A12 vs. STATIC |
 |---------------------|--------|--------|------------------------|----------------|
-| most_played_baseline| 0.9941 | 0.0002 | 0.0006 ***             | 0.00           |
+| most_played_baseline| 0.9941 | 0.0002 | 0.0003 ***             | 0.00           |
+| RANDOM_SEARCH       | 1.0169 | 0.0024 | 0.0002 ***             | 0.00           |
+| GREEDY_HILLCLIMB    | 1.0274 | 0.0030 | 0.718                  | 0.61           |
 | **STATIC**          | 1.0264 | 0.0029 | —                      | —              |
-| COEVOLVE_FROZEN     | 1.0260 | 0.0023 | 1.000                  | 0.47           |
-| COEVOLVE            | 1.0248 | 0.0024 | 0.416                  | 0.32           |
+| COEVOLVE_FROZEN     | 1.0260 | 0.0023 | 0.421                  | 0.47           |
+| COEVOLVE            | 1.0248 | 0.0024 | 0.250                  | 0.32           |
 
-Two facts matter. First, **the framework works**: every GA variant crushes the most-played-move heuristic by 3.3 standardised units (p ≈ 6 × 10⁻⁴). Second, **co-evolution does not help on this metric**: A12 is at or below 0.5 for both variants, no Wilcoxon test approaches significance, and the point estimate for `COEVOLVE` is the lowest of the three GA methods.
+Three facts stand out. First, **the framework works**: all GA-adjacent methods crush the most-played-move heuristic by a large, significant margin (p < 0.001). Second, **random search significantly underperforms the GA** (p < 0.001, A12 = 0.00), confirming that the GA's structured search adds value over pure random candidate generation. Third, **a simple greedy hill-climber matches the full population-based GA** (GREEDY_HILLCLIMB vs STATIC: p = 0.72, A12 = 0.61) — and co-evolution does not improve on either (COEVOLVE A12 = 0.32 vs STATIC).
 
 ### 4.3 Worst-band held-out score
 
@@ -138,7 +140,7 @@ Higher λ (more weight on the worst band) does not flip the ranking. Co-evolutio
 
 ## 5. Diagnosis
 
-We deliberately ran the experiment expecting one of two outcomes — co-evolution wins, or co-evolution loses with a mechanism we can name. We got the second. The mechanism has two parts.
+We deliberately ran the experiment expecting one of two outcomes — co-evolution wins, or co-evolution loses with a mechanism we can name. We got the second. The mechanism has three parts.
 
 ### 5.1 Train–eval distributional symmetry
 
@@ -161,7 +163,11 @@ We instrument opponent-population behavioural diversity (mean pairwise Jaccard d
 
 By generation 20 both populations have lost ~60% of their initial diversity. Once that happens the "adversarial pressure" the literature relies on is no longer adversarial — every opponent in the population probes nearly the same region of the simplex, so selection on candidates degenerates toward optimisation against a single representative opponent. The Hall-of-Fame mechanism (size 5) is too small to repair this on a 50-generation budget.
 
-### 5.3 What this implies
+### 5.3 Population does not beat hillclimbing
+
+GREEDY_HILLCLIMB — a (1+1)-ES with no population, no crossover, starting from the greedy initial solution — matches the full population-based GA on held-out fitness (mean 1.027 vs 1.026, p = 0.72). This means the crossover and tournament-selection machinery in the GA are not contributing beyond what a single-trajectory local search from a good starting point already achieves. The population adds overhead (30× more evaluations per generation) without corresponding exploration benefit, likely because the fitness landscape is smooth enough that hillclimbing converges to nearly the same basin from any greedy initialisation. This is a second structural reason co-evolution cannot demonstrate a population-level advantage: the population itself is not necessary.
+
+### 5.4 What this implies
 
 The negative result is not "co-evolution doesn't work for chess." It is the conjunction of (i) and (ii): given a symmetric train/eval distribution and a population whose diversity decays exponentially under tournament selection, the equilibrium of the co-evolutionary process is exactly the static optimiser's solution. Either of these levers — pulling the test distribution away from training, or actively maintaining opponent diversity (e.g., NSGA-II non-dominated sorting on (exploitation, novelty), larger HoF, tabu archives) — would restore the regime where co-evolution should help.
 

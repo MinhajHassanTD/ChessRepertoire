@@ -22,7 +22,7 @@ from src.graph import (
     save_graph,
 )
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "L2.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "snapshot.db")
 
 # ---------------------------------------------------------------------------
 # Fixtures

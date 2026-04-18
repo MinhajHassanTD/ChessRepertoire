@@ -27,7 +27,7 @@ from src.policies import (
 )
 from src.graph import build_graph
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "L2.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "snapshot.db")
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -66,7 +66,7 @@ def _make_minimal_graph(children_spec: dict) -> dict:
 
 @pytest.fixture(scope="module")
 def train_graph():
-    """Load the real training graph from L2.db (used for AC3)."""
+    """Load the real training graph from snapshot.db (used for AC3)."""
     return build_graph(DB_PATH, "train")
 
 

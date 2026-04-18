@@ -141,7 +141,7 @@ ChessRepertoire/
 |   `-- draft.md              <- paper draft
 |
 |-- data/
-|   |-- L2.db                 <- SQLite snapshot (C1 output, main database)
+|   |-- snapshot.db                 <- SQLite snapshot (C1 output, main database)
 |   |-- graph_train.pkl       <- training position graph (C2)
 |   |-- graph_heldout.pkl     <- held-out position graph (C2)
 |   |-- base_policies.pkl     <- smoothed per-band policies (C3)
@@ -174,7 +174,7 @@ ChessRepertoire/
 Lichess API
     |  (C1 -- data_ingest.py)
     v
-data/L2.db  (SQLite)
+data/snapshot.db  (SQLite)
     |  (C2 -- graph.py)
     v
 graph_train.pkl + graph_heldout.pkl
@@ -237,21 +237,21 @@ The `.env` file is gitignored and must never be committed.
 Run components **in order**. Each component depends on the output of the previous one.
 
 ### Step 1 — Collect data (C1)
-*Skip if `data/L2.db` already exists and is populated.*
+*Skip if `data/snapshot.db` already exists and is populated.*
 
 ```bash
 python src/data_ingest.py
 ```
 
-Crawls the Lichess Opening Explorer from the starting position, up to depth 10. Stores all positions and move statistics into `data/L2.db`. The script is **resumable** — if interrupted, restart it and it picks up where it left off.
+Crawls the Lichess Opening Explorer from the starting position, up to depth 10. Stores all positions and move statistics into `data/snapshot.db`. The script is **resumable** — if interrupted, restart it and it picks up where it left off.
 
 Expected output: 10,000+ train positions, 5,000+ held-out positions.
-Current database (`L2.db`): 910 positions per split (smaller dataset for faster iteration).
+Current database (`snapshot.db`): 910 positions per split (smaller dataset for faster iteration).
 
 ### Step 2 — Build position graphs (C2)
 
 ```bash
-python src/graph.py data/L2.db
+python src/graph.py data/snapshot.db
 ```
 
 Outputs: `data/graph_train.pkl`, `data/graph_heldout.pkl`
@@ -565,7 +565,7 @@ COEVOLVE should outperform STATIC on training fitness because its evolving oppon
 ## Notes
 
 - **Checkpoint safety:** C1 is fully resumable. If the API crawler is killed mid-run, just rerun it — it skips positions already fetched.
-- **Database naming:** The main database is `data/L2.db`. All components from C2 onward are configured to use this path.
+- **Database naming:** The main database is `data/snapshot.db`. All components from C2 onward are configured to use this path.
 - **Held-out evaluation always uses a uniform opponent mixture** regardless of mode, ensuring fair cross-mode comparison.
 - **Training policies are reused for held-out evaluation** — held-out policies are not separately computed, because held-out data is small and training policies generalize well enough for evaluation purposes.
 - **All scores are from White's perspective** in the eval cache and walk function. The fitness function converts Black's score with `1 - score` before combining.

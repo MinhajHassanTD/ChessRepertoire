@@ -23,9 +23,3 @@ heldout_uniform_fitness,STATIC,2.0,1.536246163801986,0.0022815309635940448
 heldout_uniform_fitness,COEVOLVE,0.0,0.5135464902015022,0.0011856962053000961
 heldout_uniform_fitness,COEVOLVE,1.0,1.0228898972811582,0.003361470530530186
 heldout_uniform_fitness,COEVOLVE,2.0,1.5349382958507145,0.008900753152695232
-heldout_adversarial_coevolved,STATIC,0.0,,
-heldout_adversarial_coevolved,STATIC,1.0,,
-heldout_adversarial_coevolved,STATIC,2.0,,
-heldout_adversarial_coevolved,COEVOLVE,0.0,,
-heldout_adversarial_coevolved,COEVOLVE,1.0,,
-heldout_adversarial_coevolved,COEVOLVE,2.0,,
