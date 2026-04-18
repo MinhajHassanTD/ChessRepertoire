@@ -16,6 +16,7 @@ from src.repertoire import Candidate
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 BANDS = ["1600-1799", "1800-1999", "2000-2199"]
+STYLES = ["aggressive", "defensive", "positional"]
 BUDGET = 20
 
 
@@ -51,9 +52,14 @@ def walk(rep, band: str, eval_cache: dict, base_policies: dict, graph: dict,
             # Leaf: return cached score
             return eval_cache["scores"][node_fen][band]
         move = rep.committed[node_fen]
-        child_fen = node["children"][move]["child_fen"]
-        return walk(rep, band, eval_cache, base_policies, graph, child_fen,
-                    perturbations=perturbations)
+        child_info = node["children"].get(move)
+        if child_info is None:
+            # Committed move isn't in this graph's children at this FEN —
+            # the held-out graph has the position but never observed this
+            # response. Treat as a leaf and fall back to the cached score.
+            return eval_cache["scores"][node_fen][band]
+        return walk(rep, band, eval_cache, base_policies, graph,
+                    child_info["child_fen"], perturbations=perturbations)
     else:
         # Opponent turn: weighted sum over all moves with nonzero policy
         policy_at_node = base_policies[band].get(node_fen, {})
@@ -111,14 +117,21 @@ def evaluate(
     graph: dict,
     use_cache: bool = True,
     perturbations: Optional[dict] = None,
+    keys: Optional[list] = None,
 ) -> dict:
     """Compute fitness for a Candidate given an opponent mixture.
 
-    Returns dict with keys: 'mean_score', 'cvar', 'fitness', 'band_scores'.
+    *keys* selects which opponent dimension labels the eval_cache and policies
+    are indexed by. Defaults to BANDS (rating bands). Pass STYLES from
+    src.fitness to use the synthetic style-archetype training pipeline.
 
-    When *perturbations* is non-empty, band_scores depend on the opponent and
-    the per-candidate cache is bypassed (neither read nor written).
+    Returns dict with keys: 'mean_score', 'cvar', 'fitness', 'band_scores'
+    (the field is named 'band_scores' for backwards-compat, but it actually
+    holds per-key scores under whatever *keys* was passed).
     """
+    if keys is None:
+        keys = BANDS
+
     # Budget check
     if len(candidate.white.committed) > BUDGET or len(candidate.black.committed) > BUDGET:
         return {
@@ -131,8 +144,15 @@ def evaluate(
     has_perts = bool(perturbations)
     cache_ok = use_cache and not has_perts
 
-    # Compute per-band scores (cached on candidate for shared sampling)
-    if cache_ok and candidate.band_scores_cache is not None:
+    # Compute per-key scores (cached on candidate for shared sampling).
+    # The cache is only valid if it was populated under the same `keys`. We
+    # detect a key mismatch by checking whether the cached dict's keys match.
+    cache_hit = (
+        cache_ok
+        and candidate.band_scores_cache is not None
+        and set(candidate.band_scores_cache.keys()) == set(keys)
+    )
+    if cache_hit:
         band_scores = candidate.band_scores_cache
         white_band_scores = candidate.white_band_scores_cache
         black_band_scores = candidate.black_band_scores_cache
@@ -140,28 +160,29 @@ def evaluate(
         band_scores = {}
         white_band_scores = {}
         black_band_scores = {}
-        for band in BANDS:
-            white_ws = walk(candidate.white, band, eval_cache, base_policies, graph,
+        for key in keys:
+            white_ws = walk(candidate.white, key, eval_cache, base_policies, graph,
                             perturbations=perturbations)
-            black_ws = walk(candidate.black, band, eval_cache, base_policies, graph,
+            black_ws = walk(candidate.black, key, eval_cache, base_policies, graph,
                             perturbations=perturbations)
             # White walk: White-perspective score directly
             # Black walk: White-perspective score; convert for Black player
             black_score_for_player = 1.0 - black_ws
-            white_band_scores[band] = white_ws
-            black_band_scores[band] = black_score_for_player
-            band_scores[band] = 0.5 * white_ws + 0.5 * black_score_for_player
+            white_band_scores[key] = white_ws
+            black_band_scores[key] = black_score_for_player
+            band_scores[key] = 0.5 * white_ws + 0.5 * black_score_for_player
         if cache_ok:
             candidate.band_scores_cache = band_scores
             candidate.white_band_scores_cache = white_band_scores
             candidate.black_band_scores_cache = black_band_scores
 
     # Mean weighted by opponent mixture
+    n = len(keys)
     mean_score = sum(
-        opponent_mixture[i] * band_scores[BANDS[i]] for i in range(3)
+        opponent_mixture[i] * band_scores[keys[i]] for i in range(n)
     )
 
-    # CVaR: with 3 bands and alpha=1/3, this is worst single band
+    # CVaR: with 3 keys and alpha = 1/3, this is the single worst key.
     sorted_scores = sorted(band_scores.values())
     cvar = sorted_scores[0]
 

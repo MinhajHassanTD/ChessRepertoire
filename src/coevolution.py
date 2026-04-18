@@ -16,6 +16,8 @@ from typing import Optional
 import numpy as np
 
 from src.fitness import (
+    BANDS,
+    STYLES,
     evaluate,
     evaluate_heldout,
     evaluate_heldout_adversarial,
@@ -226,6 +228,8 @@ def run_coevolution(
     base_policies_train: dict,
     eval_cache_train: dict,
     eval_cache_heldout: dict,
+    style_policies_train: Optional[dict] = None,
+    style_eval_cache_train: Optional[dict] = None,
 ) -> dict:
     """Execute one co-evolutionary GA run.
 
@@ -236,9 +240,29 @@ def run_coevolution(
       * use_nsga2         : bool  — Tier 2 (NSGA-II on repertoires)
       * max_perturbations : int   — cap on opponent perturbation dict size
 
+    *opponent_mode* (config key, default "bands") selects the training opponent
+    representation. When "styles", the training-side policies and eval cache are
+    swapped to the style-archetype variants (must be supplied via
+    *style_policies_train* / *style_eval_cache_train*). Held-out evaluation is
+    always band-based, regardless of opponent_mode — so styles training creates
+    a deliberate train/eval distribution shift.
+
     Always computes `heldout_adversarial_coevolved` at the end (cheap).
     """
     assert mode in ("STATIC", "COEVOLVE_FROZEN", "COEVOLVE"), f"Unknown mode: {mode}"
+
+    opponent_mode: str = str(config.get("opponent_mode", "bands"))
+    assert opponent_mode in ("bands", "styles"), f"Unknown opponent_mode: {opponent_mode}"
+    if opponent_mode == "styles":
+        assert style_policies_train is not None, "styles mode requires style_policies_train"
+        assert style_eval_cache_train is not None, "styles mode requires style_eval_cache_train"
+        train_policies = style_policies_train
+        train_eval_cache = style_eval_cache_train
+        train_keys = STYLES
+    else:
+        train_policies = base_policies_train
+        train_eval_cache = eval_cache_train
+        train_keys = BANDS
 
     start_time = time.time()
 
@@ -303,11 +327,12 @@ def run_coevolution(
             cand,
             opp.mixture,
             config,
-            eval_cache_train,
-            base_policies_train,
+            train_eval_cache,
+            train_policies,
             graph_train,
             use_cache=use_cache and not pert,
             perturbations=pert,
+            keys=train_keys,
         )
 
     # ── Generational loop ──────────────────────────────────────────────────────

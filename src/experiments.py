@@ -22,6 +22,8 @@ from src.fitness import evaluate_heldout
 from src.graph import load_graph
 from src.policies import load_policies
 from src.repertoire import BUDGET, Candidate, construct_initial
+from src.style_eval_cache import load_style_eval_cache
+from src.style_policies import load_style_policies
 
 # ── Run matrix ────────────────────────────────────────────────────────────────
 
@@ -98,6 +100,51 @@ PATH_E_EXPERIMENTS = [
     }
     for seed in range(1000, 1015)
 ]
+
+# testv2 — Path F: train against synthetic style-archetype opponents
+# (aggressive / defensive / positional) instead of rating bands. Held-out
+# evaluation stays band-uniform, so this introduces a deliberate train/eval
+# distribution shift that co-evolutionary robustness should exploit.
+PATH_F_EXPERIMENTS = (
+    [
+        {
+            'method': 'STATIC_STYLE',
+            'seed': seed,
+            'lambda_weight': 1.0,
+            'alpha': 1 / 3,
+            'opponent_mode': 'styles',
+            'use_perturbations': False,
+            'use_nsga2': False,
+        }
+        for seed in range(1000, 1015)
+    ]
+    + [
+        {
+            'method': 'COEVOLVE_STYLE',
+            'seed': seed,
+            'lambda_weight': 1.0,
+            'alpha': 1 / 3,
+            'opponent_mode': 'styles',
+            'use_perturbations': True,
+            'use_nsga2': False,
+            'max_perturbations': 30,
+        }
+        for seed in range(1000, 1015)
+    ]
+    + [
+        {
+            'method': 'COEVOLVE_STYLE_D',
+            'seed': seed,
+            'lambda_weight': 1.0,
+            'alpha': 1 / 3,
+            'opponent_mode': 'styles',
+            'use_perturbations': True,
+            'use_nsga2': True,
+            'max_perturbations': 30,
+        }
+        for seed in range(1000, 1015)
+    ]
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -215,6 +262,22 @@ def run_all(
     base_policies_train = load_policies(os.path.join(data_dir, 'base_policies.pkl'))
     eval_cache_train = load_eval_cache(os.path.join(data_dir, 'eval_cache_train.pkl'))
     eval_cache_heldout = load_eval_cache(os.path.join(data_dir, 'eval_cache_heldout.pkl'))
+
+    # Style artefacts loaded lazily — only if any run in the batch needs them.
+    needs_style = any(
+        r.get('opponent_mode') == 'styles'
+        or r['method'] in ('STATIC_STYLE', 'COEVOLVE_STYLE', 'COEVOLVE_STYLE_D')
+        for r in experiments
+    )
+    style_policies_train = None
+    style_eval_cache_train = None
+    if needs_style:
+        style_policies_train = load_style_policies(
+            os.path.join(data_dir, 'style_policies_train.pkl')
+        )
+        style_eval_cache_train = load_style_eval_cache(
+            os.path.join(data_dir, 'style_eval_cache_train.pkl')
+        )
     print("Data loaded.\n")
 
     # Ensure the output directory exists
@@ -246,13 +309,17 @@ def run_all(
                 eval_cache_heldout,
             )
         else:
-            # COEVOLVE_B/C/D are COEVOLVE with extra config keys; run as COEVOLVE
-            # and relabel afterward so each file is uniquely named.
-            coevolve_mode = (
-                'COEVOLVE'
-                if method in ('COEVOLVE_B', 'COEVOLVE_C', 'COEVOLVE_D')
-                else ('STATIC' if method == 'STATIC_DIV' else method)
-            )
+            # COEVOLVE_B/C/D and the style variants are COEVOLVE with extra
+            # config keys; STATIC_DIV / STATIC_STYLE are STATIC with extra
+            # config keys. We map to a canonical mode and relabel afterward
+            # so each file is uniquely named.
+            if method in ('COEVOLVE_B', 'COEVOLVE_C', 'COEVOLVE_D',
+                          'COEVOLVE_STYLE', 'COEVOLVE_STYLE_D'):
+                coevolve_mode = 'COEVOLVE'
+            elif method in ('STATIC_DIV', 'STATIC_STYLE'):
+                coevolve_mode = 'STATIC'
+            else:
+                coevolve_mode = method
             config = {
                 'lambda_weight': lam,
                 'alpha': run['alpha'],
@@ -261,6 +328,7 @@ def run_all(
                 'use_perturbations': run.get('use_perturbations', False),
                 'use_nsga2': run.get('use_nsga2', False),
                 'max_perturbations': run.get('max_perturbations', 30),
+                'opponent_mode': run.get('opponent_mode', 'bands'),
             }
             result = run_coevolution(
                 mode=coevolve_mode,
@@ -271,8 +339,11 @@ def run_all(
                 base_policies_train=base_policies_train,
                 eval_cache_train=eval_cache_train,
                 eval_cache_heldout=eval_cache_heldout,
+                style_policies_train=style_policies_train,
+                style_eval_cache_train=style_eval_cache_train,
             )
-            if method in ('COEVOLVE_B', 'COEVOLVE_C', 'COEVOLVE_D', 'STATIC_DIV'):
+            if method in ('COEVOLVE_B', 'COEVOLVE_C', 'COEVOLVE_D', 'STATIC_DIV',
+                          'STATIC_STYLE', 'COEVOLVE_STYLE', 'COEVOLVE_STYLE_D'):
                 result['mode'] = method
 
         with open(out_path, 'wb') as fh:

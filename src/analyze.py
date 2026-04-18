@@ -41,6 +41,9 @@ METHODS_MAIN = [
     "COEVOLVE_B",
     "COEVOLVE_C",
     "COEVOLVE_D",
+    "STATIC_STYLE",
+    "COEVOLVE_STYLE",
+    "COEVOLVE_STYLE_D",
 ]
 NON_STATIC_METHODS = [
     "most_played_baseline",
@@ -50,6 +53,9 @@ NON_STATIC_METHODS = [
     "COEVOLVE_B",
     "COEVOLVE_C",
     "COEVOLVE_D",
+    "STATIC_STYLE",
+    "COEVOLVE_STYLE",
+    "COEVOLVE_STYLE_D",
 ]
 MAIN_SEEDS = range(1000, 1015)   # 15 seeds
 SENS_SEEDS = range(2000, 2005)   # 5 seeds
@@ -80,6 +86,9 @@ _CONVERGENCE_COLORS = {
     "COEVOLVE_B": "crimson",
     "COEVOLVE_C": "mediumorchid",
     "COEVOLVE_D": "saddlebrown",
+    "STATIC_STYLE": "slategray",
+    "COEVOLVE_STYLE": "goldenrod",
+    "COEVOLVE_STYLE_D": "darkmagenta",
 }
 
 
