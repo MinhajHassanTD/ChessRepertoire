@@ -1,11 +1,15 @@
+# Secrets
 .env
+
+# Python
 __pycache__/
-*.pkl
-runs/
-results/
-data/*.db
-data/*.pkl
-code.md
-.claude/
 .pytest_cache/
-solution.txt
+*.pyc
+
+# Claude internal
+.claude/
+
+# Raw databases (only snapshot.db is tracked)
+data/L*.db
+
+# Untracked local files
