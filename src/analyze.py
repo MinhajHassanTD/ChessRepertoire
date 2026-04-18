@@ -30,12 +30,16 @@ from src.fitness import BANDS, walk
 
 METHODS_MAIN = [
     "most_played_baseline",
+    "RANDOM_SEARCH",
+    "GREEDY_HILLCLIMB",
     "STATIC",
     "COEVOLVE_FROZEN",
     "COEVOLVE",
 ]
 NON_STATIC_METHODS = [
     "most_played_baseline",
+    "RANDOM_SEARCH",
+    "GREEDY_HILLCLIMB",
     "COEVOLVE_FROZEN",
     "COEVOLVE",
 ]
@@ -60,6 +64,7 @@ _CONVERGENCE_COLORS = {
     "STATIC": "steelblue",
     "COEVOLVE_FROZEN": "darkorange",
     "COEVOLVE": "forestgreen",
+    "GREEDY_HILLCLIMB": "purple",
 }
 
 

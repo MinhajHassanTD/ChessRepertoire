@@ -2,9 +2,16 @@
 Experiment runner: define the run matrix and execute all runs, saving one
 pickle per run.
 
-Two batches:
+Three batches:
   MAIN_EXPERIMENTS        — 4 methods × 15 seeds = 60 runs (lambda = 1.0)
+  BASELINE_EXPERIMENTS    — 2 non-GA baselines × 15 seeds = 30 runs
   SENSITIVITY_EXPERIMENTS — 2 methods × 3 lambdas × 5 seeds = 30 runs
+
+Non-GA baselines establish that GA crossover/mutation adds value beyond
+greedy initialisation:
+  RANDOM_SEARCH    — evaluate 1500 random candidates, return the best
+  GREEDY_HILLCLIMB — start from greedy init, accept mutations that improve
+                     fitness (hill-climbing without a population), 1500 steps
 """
 
 from __future__ import annotations
@@ -20,10 +27,13 @@ import numpy as np
 
 from src.coevolution import run_coevolution, serialize_candidate
 from src.eval_cache import load_eval_cache
-from src.fitness import evaluate_heldout
+from src.fitness import evaluate, evaluate_heldout
 from src.graph import load_graph
 from src.policies import load_policies
-from src.repertoire import BUDGET, Candidate, construct_initial
+from src.repertoire import (
+    BUDGET, Candidate, MutationFailed, construct_initial, construct_random,
+    mutate_extend, mutate_move_swap, mutate_opening_replacement, mutate_prune,
+)
 
 
 # ── Run matrix ────────────────────────────────────────────────────────────────
@@ -34,6 +44,16 @@ MAIN_EXPERIMENTS = [
     for seed in range(1000, 1015)
 ]  # 4 methods × 15 seeds = 60 runs
 
+# Same eval budget as the GA: pop_size(30) × generations(50) = 1500 evaluations
+_GA_BUDGET = 1500
+
+BASELINE_EXPERIMENTS = [
+    {'method': method, 'seed': seed, 'lambda_weight': 1.0, 'alpha': 1 / 3,
+     'eval_budget': _GA_BUDGET}
+    for method in ['RANDOM_SEARCH', 'GREEDY_HILLCLIMB']
+    for seed in range(1000, 1015)
+]  # 2 non-GA baselines × 15 seeds = 30 runs
+
 SENSITIVITY_EXPERIMENTS = [
     {'method': method, 'seed': seed, 'lambda_weight': lam, 'alpha': 1 / 3}
     for method in ['STATIC', 'COEVOLVE']
@@ -41,7 +61,7 @@ SENSITIVITY_EXPERIMENTS = [
     for seed in range(2000, 2005)
 ]  # 2 methods × 3 lambdas × 5 seeds = 30 runs
 
-ALL_EXPERIMENTS = MAIN_EXPERIMENTS + SENSITIVITY_EXPERIMENTS  # 90 runs total
+ALL_EXPERIMENTS = MAIN_EXPERIMENTS + BASELINE_EXPERIMENTS + SENSITIVITY_EXPERIMENTS  # 120 runs total
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,6 +141,137 @@ def run_baseline(
     }
 
 
+# ── Non-GA baselines ─────────────────────────────────────────────────────────
+
+
+def _eval_candidate(candidate, config, eval_cache_train, base_policies_train, graph_train):
+    """Evaluate candidate against uniform mixture; update fitness in place."""
+    uniform = np.ones(3) / 3.0
+    result = evaluate(
+        candidate, uniform, config,
+        eval_cache_train, base_policies_train, graph_train,
+        use_cache=True,
+    )
+    candidate.fitness = result['fitness']
+    return candidate.fitness
+
+
+def run_random_search(
+    run: dict,
+    graph_train: dict,
+    graph_heldout: dict,
+    base_policies_train: dict,
+    eval_cache_train: dict,
+    eval_cache_heldout: dict,
+) -> dict:
+    """Evaluate `eval_budget` random candidates; return the best on held-out."""
+    start_time = time.time()
+    git_commit = _git_commit_hash()
+    rng = np.random.default_rng(run['seed'])
+    config = {'lambda_weight': run['lambda_weight'], 'alpha': run['alpha']}
+    budget = run.get('eval_budget', _GA_BUDGET)
+
+    best_candidate = None
+    best_fitness = -float('inf')
+
+    for _ in range(budget):
+        white_rep = construct_random(graph_train, 'white', BUDGET, rng)
+        black_rep = construct_random(graph_train, 'black', BUDGET, rng)
+        cand = Candidate(white=white_rep, black=black_rep,
+                         fitness=None, band_scores_cache=None)
+        f = _eval_candidate(cand, config, eval_cache_train, base_policies_train, graph_train)
+        if f > best_fitness:
+            best_fitness = f
+            best_candidate = cand
+
+    heldout_score = evaluate_heldout(
+        best_candidate, eval_cache_heldout, base_policies_train, graph_heldout, config,
+    )
+
+    return {
+        'mode': 'RANDOM_SEARCH',
+        'config': config,
+        'seed': run['seed'],
+        'git_commit': git_commit,
+        'history': [],
+        'final_best_candidate': serialize_candidate(best_candidate),
+        'final_training_fitness': best_fitness,
+        'heldout_score': heldout_score,
+        'wall_time_seconds': time.time() - start_time,
+    }
+
+
+_MUTATORS = [mutate_move_swap, mutate_extend, mutate_prune, mutate_opening_replacement]
+
+
+def run_greedy_hillclimb(
+    run: dict,
+    graph_train: dict,
+    graph_heldout: dict,
+    base_policies_train: dict,
+    eval_cache_train: dict,
+    eval_cache_heldout: dict,
+) -> dict:
+    """Hill-climber: start from greedy init, accept any mutation that improves fitness.
+
+    Uses the same eval budget as the GA so comparisons are fair. No population,
+    no crossover — pure (1+1)-ES on the fitness landscape.
+    """
+    start_time = time.time()
+    git_commit = _git_commit_hash()
+    rng = np.random.default_rng(run['seed'])
+    config = {'lambda_weight': run['lambda_weight'], 'alpha': run['alpha']}
+    budget = run.get('eval_budget', _GA_BUDGET)
+
+    white_rep = construct_initial(graph_train, 'white', BUDGET, rng)
+    black_rep = construct_initial(graph_train, 'black', BUDGET, rng)
+    current = Candidate(white=white_rep, black=black_rep,
+                        fitness=None, band_scores_cache=None)
+    current_fitness = _eval_candidate(
+        current, config, eval_cache_train, base_policies_train, graph_train,
+    )
+
+    for _ in range(budget - 1):
+        # Pick a random colour and a random mutator
+        color = rng.choice(['white', 'black'])
+        mutator = _MUTATORS[rng.integers(len(_MUTATORS))]
+        rep = current.white if color == 'white' else current.black
+        try:
+            new_rep = mutator(rep, rng)
+        except MutationFailed:
+            continue
+
+        if color == 'white':
+            child = Candidate(white=new_rep, black=current.black.copy(),
+                              fitness=None, band_scores_cache=None)
+        else:
+            child = Candidate(white=current.white.copy(), black=new_rep,
+                              fitness=None, band_scores_cache=None)
+
+        child_fitness = _eval_candidate(
+            child, config, eval_cache_train, base_policies_train, graph_train,
+        )
+        if child_fitness > current_fitness:
+            current = child
+            current_fitness = child_fitness
+
+    heldout_score = evaluate_heldout(
+        current, eval_cache_heldout, base_policies_train, graph_heldout, config,
+    )
+
+    return {
+        'mode': 'GREEDY_HILLCLIMB',
+        'config': config,
+        'seed': run['seed'],
+        'git_commit': git_commit,
+        'history': [],
+        'final_best_candidate': serialize_candidate(current),
+        'final_training_fitness': current_fitness,
+        'heldout_score': heldout_score,
+        'wall_time_seconds': time.time() - start_time,
+    }
+
+
 # ── Main execution ────────────────────────────────────────────────────────────
 
 
@@ -166,6 +317,24 @@ def run_all(
                 graph_train,
                 graph_heldout,
                 base_policies_train,
+                eval_cache_heldout,
+            )
+        elif method == 'RANDOM_SEARCH':
+            result = run_random_search(
+                run,
+                graph_train,
+                graph_heldout,
+                base_policies_train,
+                eval_cache_train,
+                eval_cache_heldout,
+            )
+        elif method == 'GREEDY_HILLCLIMB':
+            result = run_greedy_hillclimb(
+                run,
+                graph_train,
+                graph_heldout,
+                base_policies_train,
+                eval_cache_train,
                 eval_cache_heldout,
             )
         else:

@@ -22,6 +22,7 @@ import pytest
 
 from src.experiments import (
     ALL_EXPERIMENTS,
+    BASELINE_EXPERIMENTS,
     MAIN_EXPERIMENTS,
     SENSITIVITY_EXPERIMENTS,
     check_clean_git,
@@ -181,6 +182,8 @@ _PATCH_LOAD_POLICIES = 'src.experiments.load_policies'
 _PATCH_LOAD_EVAL_CACHE = 'src.experiments.load_eval_cache'
 _PATCH_RUN_COEVO = 'src.experiments.run_coevolution'
 _PATCH_RUN_BASELINE = 'src.experiments.run_baseline'
+_PATCH_RUN_RANDOM = 'src.experiments.run_random_search'
+_PATCH_RUN_HILLCLIMB = 'src.experiments.run_greedy_hillclimb'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -198,9 +201,13 @@ class TestRunMatrix:
         """2 methods × 3 lambdas × 5 seeds = 30 sensitivity runs."""
         assert len(SENSITIVITY_EXPERIMENTS) == 30
 
+    def test_baseline_experiments_count(self):
+        """2 non-GA baselines × 15 seeds = 30 baseline runs."""
+        assert len(BASELINE_EXPERIMENTS) == 30
+
     def test_all_experiments_total_count(self):
-        """Total run count must be exactly 90."""
-        assert len(ALL_EXPERIMENTS) == 90
+        """Total run count must be exactly 120 (60 main + 30 baselines + 30 sensitivity)."""
+        assert len(ALL_EXPERIMENTS) == 120
 
     def test_main_methods(self):
         """Main experiments must contain exactly the four specified methods."""
@@ -280,25 +287,34 @@ class TestAC1CleanRunProduces90Files:
              patch(_PATCH_LOAD_EVAL_CACHE, return_value={}):
             yield
 
+    def _patch_all_runners(self):
+        """Context manager that stubs all four runner functions."""
+        return (
+            patch(_PATCH_RUN_COEVO, side_effect=lambda mode, config, seed, **kw:
+                  _fake_result(mode, seed, config['lambda_weight'])),
+            patch(_PATCH_RUN_BASELINE, side_effect=lambda run, *a, **kw:
+                  _fake_result('most_played_baseline', run['seed'], run['lambda_weight'])),
+            patch(_PATCH_RUN_RANDOM, side_effect=lambda run, *a, **kw:
+                  _fake_result('RANDOM_SEARCH', run['seed'], run['lambda_weight'])),
+            patch(_PATCH_RUN_HILLCLIMB, side_effect=lambda run, *a, **kw:
+                  _fake_result('GREEDY_HILLCLIMB', run['seed'], run['lambda_weight'])),
+        )
+
     def test_all_90_files_created(self, tmp_path, mock_git_clean, mock_data_loaders):
-        """run_all must produce exactly 90 pickle files when starting fresh."""
-        with patch(_PATCH_RUN_COEVO, side_effect=lambda mode, config, seed, **kw:
-                   _fake_result(mode, seed, config['lambda_weight'])), \
-             patch(_PATCH_RUN_BASELINE, side_effect=lambda run, *a, **kw:
-                   _fake_result('most_played_baseline', run['seed'], run['lambda_weight'])):
+        """run_all must produce exactly 120 pickle files when starting fresh."""
+        coevo_p, base_p, rand_p, hill_p = self._patch_all_runners()
+        with coevo_p, base_p, rand_p, hill_p:
             run_all(data_dir=str(tmp_path), runs_dir=str(tmp_path / 'runs'))
 
         pkl_files = list((tmp_path / 'runs').glob('*.pkl'))
-        assert len(pkl_files) == 90, (
-            f"Expected 90 .pkl files, found {len(pkl_files)}"
+        assert len(pkl_files) == 120, (
+            f"Expected 120 .pkl files, found {len(pkl_files)}"
         )
 
     def test_all_expected_filenames_present(self, tmp_path, mock_git_clean, mock_data_loaders):
         """Each expected output filename must exist after a clean run."""
-        with patch(_PATCH_RUN_COEVO, side_effect=lambda mode, config, seed, **kw:
-                   _fake_result(mode, seed, config['lambda_weight'])), \
-             patch(_PATCH_RUN_BASELINE, side_effect=lambda run, *a, **kw:
-                   _fake_result('most_played_baseline', run['seed'], run['lambda_weight'])):
+        coevo_p, base_p, rand_p, hill_p = self._patch_all_runners()
+        with coevo_p, base_p, rand_p, hill_p:
             run_all(data_dir=str(tmp_path), runs_dir=str(tmp_path / 'runs'))
 
         runs_dir = tmp_path / 'runs'
@@ -311,10 +327,8 @@ class TestAC1CleanRunProduces90Files:
 
     def test_each_pickle_is_loadable_dict(self, tmp_path, mock_git_clean, mock_data_loaders):
         """Every saved pickle must be a loadable dict."""
-        with patch(_PATCH_RUN_COEVO, side_effect=lambda mode, config, seed, **kw:
-                   _fake_result(mode, seed, config['lambda_weight'])), \
-             patch(_PATCH_RUN_BASELINE, side_effect=lambda run, *a, **kw:
-                   _fake_result('most_played_baseline', run['seed'], run['lambda_weight'])):
+        coevo_p, base_p, rand_p, hill_p = self._patch_all_runners()
+        with coevo_p, base_p, rand_p, hill_p:
             run_all(data_dir=str(tmp_path), runs_dir=str(tmp_path / 'runs'))
 
         for pkl in (tmp_path / 'runs').glob('*.pkl'):

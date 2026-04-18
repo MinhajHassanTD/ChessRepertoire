@@ -102,7 +102,9 @@ def _build_main_runs(seeds=range(1000, 1010)) -> list[dict]:
 
     for s in seeds:
         runs.append(_make_run("most_played_baseline", s, 1.0, static_scores[s] - 0.02))
-        runs.append(_make_run("STATIC",               s, 1.0, static_scores[s]))
+        runs.append(_make_run("RANDOM_SEARCH",         s, 1.0, static_scores[s] - 0.01))
+        runs.append(_make_run("GREEDY_HILLCLIMB",      s, 1.0, static_scores[s] - 0.005))
+        runs.append(_make_run("STATIC",                s, 1.0, static_scores[s]))
         runs.append(_make_run("COEVOLVE_FROZEN",       s, 1.0, static_scores[s] + 0.01))
         runs.append(_make_run("COEVOLVE",              s, 1.0, static_scores[s] + 0.05))
     return runs
@@ -165,7 +167,10 @@ def test_main_table_columns_and_rows(tmp_path):
     }
     assert required_columns == set(df.columns), f"Unexpected columns: {set(df.columns)}"
 
-    expected_methods = {"most_played_baseline", "STATIC", "COEVOLVE_FROZEN", "COEVOLVE"}
+    expected_methods = {
+        "most_played_baseline", "RANDOM_SEARCH", "GREEDY_HILLCLIMB",
+        "STATIC", "COEVOLVE_FROZEN", "COEVOLVE",
+    }
     assert set(df["method"]) == expected_methods
 
 
