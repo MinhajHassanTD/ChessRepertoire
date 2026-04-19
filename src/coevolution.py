@@ -19,6 +19,17 @@ from typing import Optional
 
 import numpy as np
 
+from src.config import (
+    POP_SIZE_REPERTOIRES,
+    POP_SIZE_OPPONENTS,
+    N_GENERATIONS,
+    TOURNAMENT_SIZE,
+    CROSSOVER_RATE,
+    MUTATION_RATE,
+    HOF_SIZE,
+    NOVELTY_WEIGHT,
+    LAMBDA_WEIGHT,
+)
 from src.fitness import evaluate, evaluate_heldout
 from src.opponent import Opponent
 from src.repertoire import (
@@ -117,14 +128,14 @@ def run_coevolution(
 
     rng = np.random.default_rng(seed)
 
-    pop_size_r: int = int(config.get("pop_size_repertoires", 30))
-    pop_size_o: int = int(config.get("pop_size_opponents", 20))
-    n_generations: int = int(config.get("n_generations", 50))
-    tournament_size: int = int(config.get("tournament_size", 3))
-    crossover_rate: float = float(config.get("crossover_rate", 0.7))
-    mutation_rate: float = float(config.get("mutation_rate", 0.3))
-    hof_size: int = int(config.get("hof_size", 5))
-    novelty_weight: float = float(config.get("novelty_weight", 0.1))
+    pop_size_r: int = int(config.get("pop_size_repertoires", POP_SIZE_REPERTOIRES))
+    pop_size_o: int = int(config.get("pop_size_opponents", POP_SIZE_OPPONENTS))
+    n_generations: int = int(config.get("n_generations", N_GENERATIONS))
+    tournament_size: int = int(config.get("tournament_size", TOURNAMENT_SIZE))
+    crossover_rate: float = float(config.get("crossover_rate", CROSSOVER_RATE))
+    mutation_rate: float = float(config.get("mutation_rate", MUTATION_RATE))
+    hof_size: int = int(config.get("hof_size", HOF_SIZE))
+    novelty_weight: float = float(config.get("novelty_weight", NOVELTY_WEIGHT))
 
     # ── Initialisation ────────────────────────────────────────────────────────
 

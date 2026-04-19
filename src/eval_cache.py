@@ -6,11 +6,7 @@ graph, for each rating band.
 
 import pickle
 
-# ── Constants ─────────────────────────────────────────────────────────────────
-
-RATING_BANDS = ("1600-1799", "1800-1999", "2000-2199")
-TAU = 20  # empirical Bayes prior strength (Section A)
-PRIOR_MAX_PLY = 4  # positions at ply_depth <= 4 used for prior mean
+from src.config import RATING_BANDS, SHRINKAGE_TAU as TAU, PRIOR_MAX_PLY
 
 
 # ── Core functions ─────────────────────────────────────────────────────────────

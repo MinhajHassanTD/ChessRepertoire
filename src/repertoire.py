@@ -11,11 +11,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from src.graph import STARTING_FEN, aggregate_move_freq, children_of
-
-# ── Constants ──────────────────────────────────────────────────────────────────
-
-BUDGET = 20
-CLOSURE_THRESHOLD = 0.05
+from src.config import BUDGET, CLOSURE_THRESHOLD, MUTATION_RETRIES
 
 
 # ── Exceptions ────────────────────────────────────────────────────────────────
@@ -584,7 +580,7 @@ def mutate_candidate(candidate: Candidate, rng) -> Candidate:
     new_cand.white_band_scores_cache = None
     new_cand.black_band_scores_cache = None
 
-    for _ in range(5):
+    for _ in range(MUTATION_RETRIES):
         color = rng.choice(["white", "black"])
         op = rng.choice(operators)
         rep = new_cand.white if color == "white" else new_cand.black

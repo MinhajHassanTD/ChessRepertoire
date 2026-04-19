@@ -26,12 +26,27 @@ from pathlib import Path
 import numpy as np
 
 from src.coevolution import run_coevolution, serialize_candidate
+from src.config import (
+    BUDGET,
+    GA_EVAL_BUDGET as _GA_BUDGET,
+    MAIN_METHODS,
+    MAIN_LAMBDA,
+    MAIN_SEEDS,
+    BASELINE_METHODS,
+    BASELINE_SEEDS,
+    SENSITIVITY_METHODS,
+    SENSITIVITY_LAMBDAS,
+    SENSITIVITY_SEEDS,
+    LAMBDA_WEIGHT,
+    NOVELTY_WEIGHT,
+    HOF_SIZE,
+)
 from src.eval_cache import load_eval_cache
 from src.fitness import evaluate, evaluate_heldout
 from src.graph import load_graph
 from src.policies import load_policies
 from src.repertoire import (
-    BUDGET, Candidate, MutationFailed, construct_initial, construct_random,
+    Candidate, MutationFailed, construct_initial, construct_random,
     mutate_extend, mutate_move_swap, mutate_opening_replacement, mutate_prune,
 )
 
@@ -39,27 +54,24 @@ from src.repertoire import (
 # ── Run matrix ────────────────────────────────────────────────────────────────
 
 MAIN_EXPERIMENTS = [
-    {'method': method, 'seed': seed, 'lambda_weight': 1.0, 'alpha': 1 / 3}
-    for method in ['most_played_baseline', 'STATIC', 'COEVOLVE_FROZEN', 'COEVOLVE']
-    for seed in range(1000, 1015)
-]  # 4 methods × 15 seeds = 60 runs
-
-# Same eval budget as the GA: pop_size(30) × generations(50) = 1500 evaluations
-_GA_BUDGET = 1500
+    {'method': method, 'seed': seed, 'lambda_weight': MAIN_LAMBDA, 'alpha': 1 / 3}
+    for method in MAIN_METHODS
+    for seed in MAIN_SEEDS
+]
 
 BASELINE_EXPERIMENTS = [
-    {'method': method, 'seed': seed, 'lambda_weight': 1.0, 'alpha': 1 / 3,
+    {'method': method, 'seed': seed, 'lambda_weight': MAIN_LAMBDA, 'alpha': 1 / 3,
      'eval_budget': _GA_BUDGET}
-    for method in ['RANDOM_SEARCH', 'GREEDY_HILLCLIMB']
-    for seed in range(1000, 1015)
-]  # 2 non-GA baselines × 15 seeds = 30 runs
+    for method in BASELINE_METHODS
+    for seed in BASELINE_SEEDS
+]
 
 SENSITIVITY_EXPERIMENTS = [
     {'method': method, 'seed': seed, 'lambda_weight': lam, 'alpha': 1 / 3}
-    for method in ['STATIC', 'COEVOLVE']
-    for lam in [0.0, 1.0, 2.0]
-    for seed in range(2000, 2005)
-]  # 2 methods × 3 lambdas × 5 seeds = 30 runs
+    for method in SENSITIVITY_METHODS
+    for lam in SENSITIVITY_LAMBDAS
+    for seed in SENSITIVITY_SEEDS
+]
 
 ALL_EXPERIMENTS = MAIN_EXPERIMENTS + BASELINE_EXPERIMENTS + SENSITIVITY_EXPERIMENTS  # 120 runs total
 
@@ -341,8 +353,8 @@ def run_all(
             config = {
                 'lambda_weight': lam,
                 'alpha': run['alpha'],
-                'novelty_weight': run.get('novelty_weight', 0.1),
-                'hof_size': run.get('hof_size', 5),
+                'novelty_weight': run.get('novelty_weight', NOVELTY_WEIGHT),
+                'hof_size': run.get('hof_size', HOF_SIZE),
             }
             result = run_coevolution(
                 mode=method,

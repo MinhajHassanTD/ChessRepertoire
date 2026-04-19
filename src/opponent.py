@@ -12,6 +12,8 @@ from typing import Optional
 
 import numpy as np
 
+from src.config import OPPONENT_MUTATION_STRENGTH
+
 
 class Opponent:
     def __init__(self, mixture: np.ndarray):
@@ -29,7 +31,7 @@ class Opponent:
     def random(cls, rng) -> "Opponent":
         return cls(rng.dirichlet(np.ones(3)))
 
-    def mutate(self, rng, strength: float = 0.3) -> "Opponent":
+    def mutate(self, rng, strength: float = OPPONENT_MUTATION_STRENGTH) -> "Opponent":
         noise = rng.dirichlet(np.ones(3))
         new_mix = (1.0 - strength) * self.mixture + strength * noise
         new_mix = new_mix / new_mix.sum()

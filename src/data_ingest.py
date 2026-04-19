@@ -14,24 +14,35 @@ import requests
 from dotenv import load_dotenv
 import os
 
+from src.config import (
+    RATE_LIMIT_SLEEP,
+    MAX_PLY_DEPTH,
+    MIN_MOVE_FREQUENCY,
+    MIN_GAMES_SHALLOW,
+    MIN_GAMES_MID,
+    MIN_GAMES_DEEP,
+    MIN_GAMES_MID_CUTOFF,
+    MIN_GAMES_DEEP_CUTOFF,
+    TRAIN_UNTIL,
+    HELDOUT_SINCE,
+    API_SPEEDS,
+)
+
 load_dotenv()
 LICHESS_API_TOKEN = os.environ["LICHESS_API_TOKEN"]
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
 BASE_URL = "https://explorer.lichess.ovh/lichess"
-RATE_LIMIT_SLEEP = 1.1  # seconds between consecutive API calls
-MAX_PLY_DEPTH = 10
-MIN_MOVE_FREQUENCY = 0.10  # move must be >= 10% of aggregate plays at its position
 
 
 def min_games_for_depth(depth: int) -> int:
     """Depth-dependent minimum play_count required to enqueue a child position."""
-    if depth <= 3:
-        return 10_000
-    if depth <= 6:
-        return 30_000
-    return 80_000  # depth 7-8
+    if depth <= MIN_GAMES_MID_CUTOFF:
+        return MIN_GAMES_SHALLOW
+    if depth <= MIN_GAMES_DEEP_CUTOFF:
+        return MIN_GAMES_MID
+    return MIN_GAMES_DEEP
 
 BAND_TAG_TO_LABEL = {
     "1600": "1600-1799",
@@ -219,13 +230,13 @@ def _api_call(fen: str, split: str, ratings: str) -> dict:
     params: dict = {
         "variant": "standard",
         "fen": fen,
-        "speeds": "rapid,classical",
+        "speeds": API_SPEEDS,
         "ratings": ratings,
     }
     if split == "train":
-        params["until"] = "2025-06"
+        params["until"] = TRAIN_UNTIL
     else:  # heldout
-        params["since"] = "2025-06"
+        params["since"] = HELDOUT_SINCE
 
     headers = {"Authorization": f"Bearer {LICHESS_API_TOKEN}"}
     url = f"{BASE_URL}?{urlencode(params)}"

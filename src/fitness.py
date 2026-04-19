@@ -14,9 +14,7 @@ from __future__ import annotations
 import numpy as np
 
 from src.repertoire import Candidate
-
-BANDS = ["1600-1799", "1800-1999", "2000-2199"]
-BUDGET = 20
+from src.config import RATING_BANDS as BANDS, BUDGET
 
 
 # ── Walk ─────────────────────────────────────────────────────────────────────

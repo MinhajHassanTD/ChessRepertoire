@@ -8,10 +8,7 @@ import pickle
 import logging
 from typing import Dict
 
-# ── Constants ─────────────────────────────────────────────────────────────────
-
-ALPHA = 5.0  # smoothing strength (Section A)
-RATING_BANDS = ("1600-1799", "1800-1999", "2000-2199")
+from src.config import SMOOTHING_ALPHA as ALPHA, RATING_BANDS, BAND_SEPARATION_MIN_TV, BAND_SEPARATION_MIN_GAMES
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +82,7 @@ def band_separation_check(base_policies: dict, graph: dict) -> float:
     nodes = graph["nodes"]
     qualifying_fens = [
         fen for fen, node in nodes.items()
-        if node.get("total_games", 0) >= 200
+        if node.get("total_games", 0) >= BAND_SEPARATION_MIN_GAMES
         and node.get("children")
     ]
 
@@ -118,7 +115,7 @@ def band_separation_check(base_policies: dict, graph: dict) -> float:
         print(f"     {b1} vs {b2}: {mv:.4f}")
     print(f"[C3] Overall mean TV distance: {mean_tv:.4f}")
 
-    if mean_tv < 0.05:
+    if mean_tv < BAND_SEPARATION_MIN_TV:
         logger.warning(
             "[C3] Mean TV distance %.4f is below 0.05 threshold. "
             "Bands may be too similar to support a meaningful CVaR story.",
