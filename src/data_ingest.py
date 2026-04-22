@@ -26,15 +26,20 @@ from src.config import (
     TRAIN_UNTIL,
     HELDOUT_SINCE,
     API_SPEEDS,
+    RATING_BANDS,
+    STARTING_FEN,
+    LICHESS_BASE_URL,
 )
 
 load_dotenv()
 LICHESS_API_TOKEN = os.environ["LICHESS_API_TOKEN"]
 
-# ── Constants ────────────────────────────────────────────────────────────────
-
-BASE_URL = "https://explorer.lichess.ovh/lichess"
-
+# ── Derived band constants (computed from RATING_BANDS in config) ─────────────
+# Lichess API uses the lower bound of each band as its ratings parameter tag.
+# e.g. "1000-1399" → tag "1000", label "1000-1399"
+BAND_TAGS = [band.split("-")[0] for band in RATING_BANDS]
+BAND_TAG_TO_LABEL = {band.split("-")[0]: band for band in RATING_BANDS}
+_AGGREGATE_RATINGS_PARAM = ",".join(BAND_TAGS)
 
 def min_games_for_depth(depth: int) -> int:
     """Depth-dependent minimum play_count required to enqueue a child position."""
@@ -43,15 +48,6 @@ def min_games_for_depth(depth: int) -> int:
     if depth <= MIN_GAMES_DEEP_CUTOFF:
         return MIN_GAMES_MID
     return MIN_GAMES_DEEP
-
-BAND_TAG_TO_LABEL = {
-    "1600": "1600-1799",
-    "1800": "1800-1999",
-    "2000": "2000-2199",
-}
-BAND_TAGS = ["1600", "1800", "2000"]
-
-STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -239,7 +235,7 @@ def _api_call(fen: str, split: str, ratings: str) -> dict:
         params["since"] = HELDOUT_SINCE
 
     headers = {"Authorization": f"Bearer {LICHESS_API_TOKEN}"}
-    url = f"{BASE_URL}?{urlencode(params)}"
+    url = f"{LICHESS_BASE_URL}?{urlencode(params)}"
     try:
         resp = requests.get(url, headers=headers, timeout=30)
         resp.raise_for_status()
@@ -315,7 +311,7 @@ def run_ingest(db_path: str = "data/snapshot.db") -> None:
         for split in ("train", "heldout"):
             # Aggregate call
             time.sleep(RATE_LIMIT_SLEEP)
-            agg = _api_call(fen, split, "1600,1800,2000")
+            agg = _api_call(fen, split, _AGGREGATE_RATINGS_PARAM)
             api_calls += 1
 
             child_fens = _compute_child_fens(fen, agg.get("moves", []))

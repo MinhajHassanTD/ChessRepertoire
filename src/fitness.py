@@ -116,7 +116,7 @@ def evaluate(
             candidate.white_band_scores_cache = white_band_scores
             candidate.black_band_scores_cache = black_band_scores
 
-    mean_score = sum(opponent_mixture[i] * band_scores[BANDS[i]] for i in range(3))
+    mean_score = sum(opponent_mixture[i] * band_scores[BANDS[i]] for i in range(len(BANDS)))
 
     # CVaR with alpha = 1/3 over 3 bands collapses to the single worst band.
     cvar = min(band_scores.values())
@@ -149,7 +149,7 @@ def evaluate_heldout(
     held-out eval cache and graph.  Positions absent from graph_heldout are
     treated as leaves via the held-out eval cache (or its prior_mean).
     """
-    uniform_mixture = np.ones(3) / 3.0
+    uniform_mixture = np.ones(len(BANDS)) / len(BANDS)
     heldout_cand = _wrap_for_heldout(candidate, graph_heldout)
     result = evaluate(
         heldout_cand,

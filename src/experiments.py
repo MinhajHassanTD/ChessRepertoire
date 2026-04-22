@@ -40,6 +40,7 @@ from src.config import (
     LAMBDA_WEIGHT,
     NOVELTY_WEIGHT,
     HOF_SIZE,
+    RATING_BANDS,
 )
 from src.eval_cache import load_eval_cache
 from src.fitness import evaluate, evaluate_heldout
@@ -84,6 +85,13 @@ def run_filename(method: str, lambda_weight: float, seed: int, runs_dir: str = '
 
 
 def check_clean_git() -> None:
+    """Exit with error if there are uncommitted git changes.
+
+    Skipped when the environment variable SKIP_GIT_CHECK=1 is set.
+    """
+    if os.environ.get("SKIP_GIT_CHECK", "0") == "1":
+        print("[git] SKIP_GIT_CHECK=1 — skipping clean-tree check.")
+        return
     try:
         status = subprocess.check_output(
             ['git', 'status', '--porcelain'],
@@ -95,7 +103,7 @@ def check_clean_git() -> None:
     if status:
         print(
             "ERROR: Uncommitted git changes detected.\n"
-            "Commit or stash all changes before running experiments.\n"
+            "Commit or stash changes, or set SKIP_GIT_CHECK=1 to bypass.\n"
             f"{status}",
             file=sys.stderr,
         )
@@ -158,7 +166,7 @@ def run_baseline(
 
 def _eval_candidate(candidate, config, eval_cache_train, base_policies_train, graph_train):
     """Evaluate candidate against uniform mixture; update fitness in place."""
-    uniform = np.ones(3) / 3.0
+    uniform = np.ones(len(RATING_BANDS)) / len(RATING_BANDS)
     result = evaluate(
         candidate, uniform, config,
         eval_cache_train, base_policies_train, graph_train,
@@ -291,11 +299,13 @@ def run_all(
     data_dir: str = 'data',
     runs_dir: str = 'runs',
     experiments: list | None = None,
+    skip_git_check: bool = False,
 ) -> None:
     if experiments is None:
         experiments = ALL_EXPERIMENTS
 
-    check_clean_git()
+    if not skip_git_check:
+        check_clean_git()
 
     print("Loading data files ...")
     graph_train = load_graph(os.path.join(data_dir, 'graph_train.pkl'))

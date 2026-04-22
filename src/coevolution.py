@@ -29,6 +29,8 @@ from src.config import (
     HOF_SIZE,
     NOVELTY_WEIGHT,
     LAMBDA_WEIGHT,
+    OPPONENT_CROSSOVER_RATE,
+    OPPONENT_MUTATION_RATE,
 )
 from src.fitness import evaluate, evaluate_heldout
 from src.opponent import Opponent
@@ -243,12 +245,12 @@ def run_coevolution(
             new_o_pop: list[Opponent] = []
             for _ in range(pop_size_o):
                 parent_a = _tournament_select(O_pop, rng, tournament_size)
-                if rng.random() < 0.5:
+                if rng.random() < OPPONENT_CROSSOVER_RATE:
                     parent_b = _tournament_select(O_pop, rng, tournament_size)
                     child_opp = parent_a.crossover(parent_b, rng)
                 else:
                     child_opp = Opponent(parent_a.mixture.copy())
-                if rng.random() < 0.5:
+                if rng.random() < OPPONENT_MUTATION_RATE:
                     child_opp = child_opp.mutate(rng)
                 new_o_pop.append(child_opp)
             O_pop = new_o_pop

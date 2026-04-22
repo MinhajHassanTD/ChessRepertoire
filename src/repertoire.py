@@ -10,8 +10,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
-from src.graph import STARTING_FEN, aggregate_move_freq, children_of
-from src.config import BUDGET, CLOSURE_THRESHOLD, MUTATION_RETRIES
+from src.graph import aggregate_move_freq, children_of
+from src.config import BUDGET, CLOSURE_THRESHOLD, MUTATION_RETRIES, STARTING_FEN, OPENING_REPLACEMENT_MAX_PLY
 
 
 # ── Exceptions ────────────────────────────────────────────────────────────────
@@ -461,7 +461,7 @@ def mutate_opening_replacement(rep: Repertoire, rng) -> Repertoire:
     and rebuild everything below from scratch via construct_random.
     """
     shallow = [f for f in rep.committed
-               if rep.graph["nodes"][f]["ply_depth"] <= 2]
+               if rep.graph["nodes"][f]["ply_depth"] <= OPENING_REPLACEMENT_MAX_PLY]
     if not shallow:
         raise MutationFailed("No shallow committed nodes")
 

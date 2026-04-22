@@ -6,6 +6,7 @@ with additive smoothing toward the aggregate distribution.
 
 import pickle
 import logging
+from itertools import combinations
 from typing import Dict
 
 from src.config import SMOOTHING_ALPHA as ALPHA, RATING_BANDS, BAND_SEPARATION_MIN_TV, BAND_SEPARATION_MIN_GAMES
@@ -86,11 +87,7 @@ def band_separation_check(base_policies: dict, graph: dict) -> float:
         and node.get("children")
     ]
 
-    pairs = [
-        ("1600-1799", "1800-1999"),
-        ("1600-1799", "2000-2199"),
-        ("1800-1999", "2000-2199"),
-    ]
+    pairs = list(combinations(RATING_BANDS, 2))
 
     pair_tvs = {pair: [] for pair in pairs}
 

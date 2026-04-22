@@ -5,6 +5,7 @@ Every tunable constant lives here, organized by component.
 Change a value here and it takes effect everywhere automatically.
 
 SECTIONS:
+  0. SHARED CONSTANTS      — starting position, API URL
   1. DATA COLLECTION       — how the Lichess crawler behaves
   2. SMOOTHING & SCORING   — how move probabilities and scores are computed
   3. REPERTOIRE CHROMOSOME — move budget and closure rules
@@ -12,7 +13,18 @@ SECTIONS:
   5. OPPONENT EVOLUTION    — opponent chromosome behavior
   6. FITNESS FUNCTION      — how fitness is computed from scores
   7. EXPERIMENT MATRIX     — which runs to execute and with what parameters
+  8. ANALYSIS              — held-out adversarial evaluation parameters
 """
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 0. SHARED CONSTANTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Standard chess starting position (4-field canonical FEN).
+STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
+
+# Lichess Opening Explorer API base URL.
+LICHESS_BASE_URL = "https://explorer.lichess.ovh/lichess"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. DATA COLLECTION  (src/data_ingest.py)
@@ -108,6 +120,10 @@ CLOSURE_THRESHOLD = 0.05
 # More retries = more likely to succeed but slower per generation.
 MUTATION_RETRIES = 5
 
+# Maximum ply depth at which a committed node is eligible for opening replacement.
+# Nodes at ply_depth <= this value can have their subtree replaced wholesale.
+OPENING_REPLACEMENT_MAX_PLY = 2
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. GENETIC ALGORITHM  (src/coevolution.py)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -161,13 +177,22 @@ OPPONENT_MUTATION_STRENGTH = 0.3
 # the same worst-case band). Set to 0.0 to disable diversity bonus.
 NOVELTY_WEIGHT = 0.1
 
+# Probability that two selected opponent parents undergo crossover.
+# 0.0 = always clone parent A, 1.0 = always crossover.
+OPPONENT_CROSSOVER_RATE = 0.5
+
+# Probability that an opponent child is mutated after crossover/cloning.
+# 0.0 = no mutation, 1.0 = always mutate.
+OPPONENT_MUTATION_RATE = 0.5
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. FITNESS FUNCTION  (src/fitness.py)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # The three rating bands used in all computations.
 # These must match what was crawled and stored in the database.
-RATING_BANDS = ("1600-1799", "1800-1999", "2000-2199")
+RATING_BANDS = ("1000-1399", "1400-1799", "1800-2199")
+
 
 # The robust fitness objective:
 #   fitness = mean_score + LAMBDA_WEIGHT * CVaR
@@ -203,3 +228,21 @@ GA_EVAL_BUDGET   = POP_SIZE_REPERTOIRES * N_GENERATIONS  # = 1500
 SENSITIVITY_METHODS = ["STATIC", "COEVOLVE"]
 SENSITIVITY_LAMBDAS = [0.0, 1.0, 2.0]
 SENSITIVITY_SEEDS   = list(range(2000, 2005))   # 5 seeds (smaller — just sensitivity)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. ANALYSIS  (src/analyze.py)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# RNG seed for the adversarial Dirichlet mixture sampling.
+ADVERSARIAL_RNG_SEED = 7
+
+# Number of random opponent mixtures to sample for the adversarial metric.
+ADVERSARIAL_N_SAMPLES = 200
+
+# Dirichlet concentration parameter for sampling opponent mixtures.
+# 1.0 = uniform Dirichlet (all mixtures equally likely).
+ADVERSARIAL_DIRICHLET_ALPHA = 1.0
+
+# Quantile of sampled mixture scores used as the adversarial metric.
+# 0.10 = 10th percentile (worst 10% of random opponents).
+ADVERSARIAL_QUANTILE = 0.10

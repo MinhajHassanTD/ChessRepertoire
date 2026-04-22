@@ -8,10 +8,7 @@ import pickle
 import sqlite3
 from typing import Optional
 
-# ── Constants ─────────────────────────────────────────────────────────────────
-
-STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
-RATING_BANDS = ("1600-1799", "1800-1999", "2000-2199")
+from src.config import RATING_BANDS, STARTING_FEN
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
