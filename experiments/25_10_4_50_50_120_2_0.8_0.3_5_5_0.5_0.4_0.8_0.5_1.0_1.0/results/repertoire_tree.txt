@@ -1,0 +1,82 @@
+======================================================================
+  CHESS REPERTOIRE PROJECT
+  DECISION TREE — branch = opponent choice, → = your response
+  Ranked by held-out fitness (lambda=1.0, best seed per mode)
+======================================================================
+
+######################################################################
+  MODE : COEVOLVE  |  SEED : 1001  |  HELDOUT FITNESS : 1.0697
+  White committed : 2 moves  |  Black committed : 5 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  1.d4
+  └─ 1...d5  →  2.c4
+     └─ 2...dxc4
+
+  ── AS BLACK ──
+
+  └─ 1.e4  →  1...c5
+     └─ 2.Nf3  →  2...Nc6
+        └─ 3.d4  →  3...cxd4
+           └─ 4.Nxd4  →  4...Nxd4
+              └─ 5.Qxd4  →  5...d6
+
+######################################################################
+  MODE : COEVOLVE_FROZEN  |  SEED : 1000  |  HELDOUT FITNESS : 1.0697
+  White committed : 2 moves  |  Black committed : 5 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  1.d4
+  └─ 1...d5  →  2.c4
+     └─ 2...dxc4
+
+  ── AS BLACK ──
+
+  └─ 1.e4  →  1...c5
+     └─ 2.Nf3  →  2...Nc6
+        └─ 3.d4  →  3...cxd4
+           └─ 4.Nxd4  →  4...Nxd4
+              └─ 5.Qxd4  →  5...d6
+
+######################################################################
+  MODE : STATIC  |  SEED : 1000  |  HELDOUT FITNESS : 1.0697
+  White committed : 2 moves  |  Black committed : 5 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  1.d4
+  └─ 1...d5  →  2.c4
+     └─ 2...dxc4
+
+  ── AS BLACK ──
+
+  └─ 1.e4  →  1...c5
+     └─ 2.Nf3  →  2...Nc6
+        └─ 3.d4  →  3...cxd4
+           └─ 4.Nxd4  →  4...Nxd4
+              └─ 5.Qxd4  →  5...d6
+
+######################################################################
+  MODE : GREEDY_HILLCLIMB  |  SEED : 1000  |  HELDOUT FITNESS : 1.0697
+  White committed : 2 moves  |  Black committed : 5 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  1.d4
+  └─ 1...d5  →  2.c4
+     └─ 2...dxc4
+
+  ── AS BLACK ──
+
+  └─ 1.e4  →  1...c5
+     └─ 2.Nf3  →  2...Nc6
+        └─ 3.d4  →  3...cxd4
+           └─ 4.Nxd4  →  4...Nxd4
+              └─ 5.Qxd4  →  5...d6
+

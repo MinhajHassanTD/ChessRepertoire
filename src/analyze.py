@@ -1391,7 +1391,11 @@ def _write_mode_block(
     b_rea  = set(cand["black_reached"])
     mode   = best.get("mode", "?")
     seed   = best.get("seed", "?")
-    heldout = best.get("heldout_score", float("nan"))
+    hm = best.get("heldout_metrics", {})
+    heldout_legacy = best.get("heldout_score", float("nan"))
+    heldout_uniform = hm.get("heldout_uniform_mean", heldout_legacy)
+    white_heldout = hm.get("white_mean", float("nan"))
+    black_heldout = hm.get("black_mean", float("nan"))
 
     if fmt == "A":
         w_lines = _render_tree_A(w_com, w_rea, "white", graph_train)
@@ -1403,7 +1407,12 @@ def _write_mode_block(
         b_lines = _render_format_C(raw_b)
 
     fh.write(f"{SEP}\n")
-    fh.write(f"  MODE : {mode}  |  SEED : {seed}  |  HELDOUT FITNESS : {heldout:.4f}\n")
+    fh.write(
+        f"  MODE : {mode}  |  SEED : {seed}"
+        f"  |  HELDOUT_LEGACY : {heldout_legacy:.4f}"
+        f"  |  HELDOUT_UNIFORM : {heldout_uniform:.4f}"
+        f"  |  WHITE : {white_heldout:.4f}  |  BLACK : {black_heldout:.4f}\n"
+    )
     fh.write(f"  White committed : {len(w_com)} moves  |  "
              f"Black committed : {len(b_com)} moves\n")
     fh.write(f"{SEP}\n\n")
