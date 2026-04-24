@@ -350,7 +350,7 @@ def run_all(
             print(f"[{completed}/{total}] SKIP  {out_path}")
             continue
 
-        print(f"[{completed + 1}/{total}] RUN   method={method}  lam={lam}  seed={seed}{suffix} ...")
+        print(f"[{completed + 1}/{total}] RUN   method={method}  lam={lam}  seed={seed} ...")
 
         if method == 'most_played_baseline':
             result = run_baseline(

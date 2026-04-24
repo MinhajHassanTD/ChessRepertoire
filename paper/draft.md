@@ -20,7 +20,7 @@ The interesting modeling choice is what to optimize *for*. A repertoire that is 
 
 > *Under what conditions does co-evolutionary adversarial training actually improve generalization for this class of constrained problem, and when it does not, why not?*
 
-We do not pre-suppose the answer. We implement the full pipeline, run 150 total experiments across five experiment types, report the numbers honestly, and diagnose the mechanism behind the result.
+We do not pre-suppose the answer. We implement the full pipeline, run 105 total experiments across three experiment types, report the numbers honestly, and diagnose the mechanism behind the result.
 
 ### Contributions
 
@@ -98,11 +98,9 @@ An opponent is a 3-simplex weight vector over rating bands. `STATIC` uses one fr
 
 ### 4.1 Setup
 
-- **Main comparison:** 4 methods × 15 seeds = 60 runs (seeds 1000–1014)
+- **Main comparison:** 3 methods × 15 seeds = 45 runs (seeds 1000–1014)
 - **Non-GA baselines:** `RANDOM_SEARCH` and `GREEDY_HILLCLIMB` × 15 seeds = 30 runs. Eval budget = pop × generations = 6,000 fitness calls (same as GA).
 - **Closure ablation:** `STATIC_NOCLOSURE` and `COEVOLVE_NOCLOSURE` × 15 seeds = 30 runs (paired with main seeds)
-- **λ sensitivity:** `STATIC` and `COEVOLVE` × λ ∈ {0.0, 1.0, 2.0} × 5 seeds = 30 runs
-- **Threshold sensitivity:** `STATIC` × threshold ∈ {0.05, 0.10, 0.15, 0.20, 0.30} × 5 seeds = 25 runs (Appendix)
 - **Held-out evaluation** always uses uniform opponent mixture (1/3, 1/3, 1/3) so cross-method comparison is fair
 - **Stat tests:** paired Wilcoxon vs. `STATIC`, Holm-corrected; Vargha–Delaney A12 effect size
 
@@ -114,18 +112,16 @@ An opponent is a 3-simplex weight vector over rating bands. `STATIC` uses one fr
 | RANDOM_SEARCH        | 1.0169 | 0.0024 | < 0.001 ***            | 0.00           |
 | GREEDY_HILLCLIMB     | 1.0274 | 0.0030 | 0.718                  | 0.61           |
 | **STATIC**           | 1.0264 | 0.0029 | —                      | —              |
-| COEVOLVE_FROZEN      | 1.0260 | 0.0023 | 0.421                  | 0.47           |
 | COEVOLVE             | 1.0248 | 0.0024 | 0.250                  | 0.32           |
 
 Three facts stand out. First, **the framework works**: all GA-adjacent methods crush the most-played-move heuristic by a large, significant margin. Second, **a simple greedy hill-climber matches the full population-based GA** (GREEDY_HILLCLIMB vs. STATIC: p = 0.72, A12 = 0.61) — the population is not necessary. Third, **co-evolution does not improve on the static baseline** (COEVOLVE A12 = 0.32 vs. STATIC).
 
 ### 4.3 Worst-Band Held-Out Score
 
-| Method           | Mean   | Std    | A12 vs. STATIC |
-|------------------|--------|--------|----------------|
-| STATIC           | 0.5124 | 0.0014 | —              |
-| COEVOLVE_FROZEN  | 0.5120 | 0.0012 | 0.44           |
-| COEVOLVE         | 0.5115 | 0.0013 | 0.30           |
+| Method   | Mean   | Std    | A12 vs. STATIC |
+|----------|--------|--------|----------------|
+| STATIC   | 0.5124 | 0.0014 | —              |
+| COEVOLVE | 0.5115 | 0.0013 | 0.30           |
 
 The same picture holds on the CVaR-relevant tail metric. If co-evolution were buying robustness anywhere we would expect to see it on worst-band performance — we do not.
 
@@ -139,16 +135,6 @@ The same picture holds on the CVaR-relevant tail metric. If co-evolution were bu
 | COEVOLVE_NOCLOSURE | 1.0171        | 0.0038 | < 0.001 ***        | 0.06 |
 
 Removing the closure rule drops performance significantly for both methods. The closure rule — which automatically extends coverage to any opponent reply played in ≥15% of games — is load-bearing, not cosmetic.
-
-### 4.5 λ Sensitivity
-
-| λ   | STATIC mean | COEVOLVE mean | Δ      |
-|-----|-------------|---------------|--------|
-| 0.0 | 0.5135      | 0.5135        |  0.000 |
-| 1.0 | 0.5142      | 0.5122        | −0.002 |
-| 2.0 | 0.5133      | 0.5127        | −0.001 |
-
-Higher λ (more weight on the worst band) does not flip the ranking. Co-evolution is not under-tuned; the null result is structural.
 
 ---
 
@@ -210,7 +196,7 @@ python src/data_ingest.py          # ≈ 30 min, resumable; writes data/L2.db
 python src/graph.py data/L2.db
 python src/policies.py
 python src/eval_cache.py
-python src/experiments.py          # ≈ 2–3 hours for all 150 runs
+python src/experiments.py          # ≈ 1–2 hours for all 105 runs
 python src/analyze.py              # writes results/
 pytest tests/
 ```
@@ -239,8 +225,3 @@ Branch: `final`. Every run pickle stores the git commit hash in its `git_commit`
 | Novelty weight                     | 0.4                    |
 | Hall-of-Fame size                  | 5                      |
 | Seeds (main + closure ablation)    | 15 (1000–1014)         |
-| Seeds (sensitivity)                | 5 (2000–2004)          |
-
-## Appendix C — Closure Threshold Sensitivity
-
-STATIC run with threshold ∈ {0.05, 0.10, **0.15**, 0.20, 0.30} × 5 seeds. The default (0.15) sits near the top of the performance curve; thresholds below 0.05 waste budget on rare replies, thresholds above 0.25 leave common replies uncovered. The result is robust to ±0.05 around the default.

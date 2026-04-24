@@ -1,15 +1,14 @@
 """
 Analysis: load all run pickles, compute statistics, and produce tables + plots.
 
-Core outputs (results/):
+Outputs (all written to results/):
     main_table.csv              — one row per (metric, method): mean/std, Wilcoxon p,
                                   A12 effect size (all vs STATIC as reference)
     convergence.png             — GA training curves with 95% CI across seeds
     score_distributions.png     — box + strip for both held-out metrics, all methods
     band_breakdown.png          — per-rating-band score grouped by method
     closure_ablation.png        — closure ON vs OFF for STATIC and COEVOLVE
-
-Appendix outputs (only when include_appendix=True):
+    white_black_breakdown.png   — white score vs black score strip plots per method
     ga_vs_nonga.png             — Non-GA / GA groups separated and sorted
     repertoire_structure.png    — committed moves + subgraph size per method
     coevolve_dynamics.png       — COEVOLVE internal dynamics (3-panel)
@@ -497,6 +496,58 @@ def plot_band_breakdown(runs: list[dict], out_path: str) -> None:
     plt.close(fig)
 
 
+# ── White vs Black breakdown ──────────────────────────────────────────────────
+
+def plot_white_black_breakdown(runs: list[dict], out_path: str) -> None:
+    """Side-by-side strip plots: white score vs black score per method."""
+    all_methods = ["most_played_baseline", "RANDOM_SEARCH", "GREEDY_HILLCLIMB", "STATIC", "COEVOLVE"]
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in all_methods
+    }
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=False)
+    fig.suptitle("White vs Black Repertoire Performance  (held-out, dashed = 0.5)", fontsize=13)
+
+    for ax, color_key, title, ylabel in [
+        (axes[0], "white_mean", "(a) Playing as White",  "Score Playing as White"),
+        (axes[1], "black_mean", "(b) Playing as Black",  "Score Playing as Black"),
+    ]:
+        for xi, method in enumerate(all_methods):
+            vals = [
+                r["heldout_metrics"][color_key]
+                for r in filtered[method]
+                if color_key in r.get("heldout_metrics", {})
+            ]
+            if not vals:
+                continue
+            color = _METHOD_COLORS.get(method, "#333333")
+            jitter = np.random.default_rng(42).uniform(-0.08, 0.08, size=len(vals))
+            ax.scatter(
+                [xi] * len(vals) + jitter,
+                vals,
+                color=color, alpha=0.75, s=30, zorder=3,
+            )
+            ax.plot([xi - 0.2, xi + 0.2], [np.mean(vals)] * 2,
+                    color="black", linewidth=2.0, zorder=4)
+
+        ax.axhline(0.5, color="grey", linestyle="--", linewidth=1.0, alpha=0.6)
+        ax.set_xticks(range(len(all_methods)))
+        ax.set_xticklabels(
+            [_METHOD_LABELS[m] for m in all_methods],
+            rotation=25, ha="right", fontsize=10,
+        )
+        ax.set_ylabel(ylabel, fontsize=11)
+        ax.set_title(title, fontsize=11)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", alpha=0.2)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 # ── GA vs Non-GA comparison ───────────────────────────────────────────────────
 
 def plot_ga_vs_nonga(runs: list[dict], out_path: str) -> None:
@@ -574,163 +625,6 @@ def plot_ga_vs_nonga(runs: list[dict], out_path: str) -> None:
     plt.close(fig)
 
 
-# ── White vs Black breakdown ───────────────────────────────────────────────────
-
-def plot_white_black_breakdown(runs: list[dict], out_path: str) -> None:
-    """Box + strip plots for white and black held-out scores separately."""
-    filtered = {
-        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-        for m in METHODS_MAIN
-    }
-
-    def _scores(m, key):
-        return [r["heldout_metrics"][key]
-                for r in filtered[m]
-                if key in r.get("heldout_metrics", {})]
-
-    fig, axes = plt.subplots(1, 2, figsize=(13, 4.5), sharey=True)
-    rng_j = np.random.default_rng(2)
-
-    for ax_i, (color_key, score_key, panel) in enumerate([
-        ("White", "white_mean", "(a)"),
-        ("Black", "black_mean", "(b)"),
-    ]):
-        ax = axes[ax_i]
-        for i, m in enumerate(METHODS_MAIN):
-            vals = _scores(m, score_key)
-            if not vals:
-                continue
-            bp = ax.boxplot(
-                vals, positions=[i], widths=0.45, patch_artist=True,
-                medianprops={"color": "black", "linewidth": 2},
-                whiskerprops={"linewidth": 1.2}, capprops={"linewidth": 1.2},
-                showfliers=False,
-            )
-            bp["boxes"][0].set_facecolor(_METHOD_COLORS[m])
-            bp["boxes"][0].set_alpha(0.45)
-            jitter = rng_j.uniform(-0.15, 0.15, len(vals))
-            ax.scatter([i + j for j in jitter], vals, color=_METHOD_COLORS[m],
-                       s=28, alpha=0.85, zorder=4, edgecolors="white", linewidths=0.4)
-
-        ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.35)
-        ax.set_xticks(range(len(METHODS_MAIN)))
-        ax.set_xticklabels([_METHOD_LABELS[m] for m in METHODS_MAIN],
-                           rotation=30, ha="right", fontsize=9.5)
-        ax.set_ylabel(f"Score Playing as {color_key}", fontsize=10.5)
-        ax.set_title(f"{panel} Playing as {color_key}", fontsize=11)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.grid(axis="y", alpha=0.25)
-
-    fig.suptitle("White vs Black Repertoire Performance  (held-out, dashed = 0.5)", fontsize=12)
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
-# ── Generalization scatter ─────────────────────────────────────────────────────
-
-def plot_generalization(runs: list[dict], out_path: str) -> None:
-    """Scatter of training fitness vs held-out score, one point per seed."""
-    filtered = {
-        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-        for m in METHODS_MAIN
-    }
-    markers = {
-        "most_played_baseline": "s",
-        "RANDOM_SEARCH":        "^",
-        "GREEDY_HILLCLIMB":     "D",
-        "STATIC":               "o",
-        "COEVOLVE_FROZEN":      "P",
-        "COEVOLVE":             "*",
-    }
-
-    fig, ax = plt.subplots(figsize=(7, 5.5))
-    all_train = []
-
-    for m in METHODS_MAIN:
-        xs, ys = [], []
-        for r in filtered[m]:
-            tf = r.get("final_training_fitness")
-            ho = r.get("heldout_metrics", {}).get("heldout_uniform_mean")
-            if tf is not None and ho is not None:
-                xs.append(float(tf))
-                ys.append(float(ho))
-                all_train.append(float(tf))
-        if xs:
-            ax.scatter(xs, ys, color=_METHOD_COLORS[m], marker=markers[m],
-                       s=60, alpha=0.82, label=_METHOD_LABELS[m],
-                       edgecolors="white", linewidths=0.5)
-
-    if all_train:
-        lo, hi = min(all_train), max(all_train)
-        pad = max((hi - lo) * 0.06, 0.01)
-        diag = np.linspace(lo - pad, hi + pad, 100)
-        ax.plot(diag, diag, "k--", linewidth=1, alpha=0.4, label="y = x  (no gap)")
-
-    ax.set_xlabel("Final Training Fitness", fontsize=11)
-    ax.set_ylabel("Held-out Mean Score", fontsize=11)
-    ax.set_title(
-        "Generalization: Training vs Held-out\n(points below y=x → training was optimistic)",
-        fontsize=11,
-    )
-    ax.legend(fontsize=9, framealpha=0.9, ncol=2)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.grid(alpha=0.25)
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
-# ── Generalization gap ────────────────────────────────────────────────────────
-
-def plot_generalization_gap(runs: list[dict], out_path: str) -> None:
-    """Bar chart: (training fitness - held-out score) per method, sorted."""
-    filtered = {
-        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-        for m in METHODS_MAIN
-    }
-
-    gaps_by_method: dict[str, list[float]] = {}
-    for m in METHODS_MAIN:
-        gaps = []
-        for r in filtered[m]:
-            tf = r.get("final_training_fitness")
-            ho = r.get("heldout_metrics", {}).get("heldout_uniform_mean")
-            if tf is not None and ho is not None:
-                gaps.append(float(tf) - float(ho))
-        if gaps:
-            gaps_by_method[m] = gaps
-
-    sorted_methods = sorted(gaps_by_method, key=lambda m: np.mean(gaps_by_method[m]), reverse=True)
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    for i, m in enumerate(sorted_methods):
-        gaps   = gaps_by_method[m]
-        mean_g = float(np.mean(gaps))
-        std_g  = float(np.std(gaps, ddof=1)) if len(gaps) > 1 else 0.0
-        ax.bar(i, mean_g, width=0.6, color=_METHOD_COLORS[m], alpha=0.82,
-               edgecolor="black", linewidth=0.7)
-        ax.errorbar(i, mean_g, yerr=std_g, fmt="none", color="black", capsize=4, linewidth=1.5)
-
-    ax.axhline(0.0, color="black", linewidth=1.5)
-    ax.set_xticks(range(len(sorted_methods)))
-    ax.set_xticklabels([_METHOD_LABELS[m] for m in sorted_methods],
-                       rotation=25, ha="right", fontsize=10)
-    ax.set_ylabel("Training Fitness − Held-out Score", fontsize=10.5)
-    ax.set_title(
-        "Generalization Gap per Method  (positive = training was optimistic; error bars = ±1 SD)",
-        fontsize=11,
-    )
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.grid(axis="y", alpha=0.25)
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
 # ── Repertoire structure ───────────────────────────────────────────────────────
 
 def plot_repertoire_structure(runs: list[dict], out_path: str) -> None:
@@ -786,52 +680,6 @@ def plot_repertoire_structure(runs: list[dict], out_path: str) -> None:
         ax.grid(axis="y", alpha=0.25)
 
     fig.suptitle("Repertoire Structure Across Seeds  (error bars = ±1 SD)", fontsize=12)
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
-# ── Lambda sensitivity visual ──────────────────────────────────────────────────
-
-def plot_lambda_sensitivity_visual(runs: list[dict], out_path: str) -> None:
-    """Line plot: held-out score vs lambda for STATIC and COEVOLVE."""
-    metrics_info = [
-        ("heldout_uniform_mean", "Mean Score"),
-        ("heldout_worst_band",   "Worst-Band Score"),
-    ]
-    lambdas = list(SENSITIVITY_LAMBDAS)
-
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=False)
-
-    for ax, (metric, ylabel) in zip(axes, metrics_info):
-        for m in ["STATIC", "COEVOLVE"]:
-            means, stds = [], []
-            for lam in lambdas:
-                subset = _select(runs, mode=m, seeds=SENSITIVITY_SEEDS, lambda_weight=lam)
-                vals   = list(_scores_by_seed_metric(subset, metric).values())
-                means.append(float(np.mean(vals)) if vals else float("nan"))
-                stds.append(float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0)
-            means_a = np.array(means)
-            stds_a  = np.array(stds)
-            color   = _METHOD_COLORS[m]
-            ax.plot(lambdas, means_a, "o-", label=_METHOD_LABELS[m],
-                    color=color, linewidth=2, markersize=7)
-            ax.fill_between(lambdas, means_a - stds_a, means_a + stds_a,
-                            alpha=0.15, color=color)
-
-        ax.set_xlabel("Lambda (λ)", fontsize=11)
-        ax.set_ylabel(ylabel, fontsize=10.5)
-        ax.set_title(ylabel, fontsize=11)
-        ax.set_xticks(lambdas)
-        ax.legend(fontsize=10, framealpha=0.9)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.grid(alpha=0.25)
-
-    fig.suptitle(
-        "Lambda Sensitivity: Robustness Weight vs Held-out Performance  (shading = ±1 SD)",
-        fontsize=11,
-    )
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -916,85 +764,6 @@ def plot_coevolve_dynamics(runs: list[dict], out_path: str) -> None:
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-
-
-# ── Seed consistency heatmap ───────────────────────────────────────────────────
-
-def plot_seed_heatmap(runs: list[dict], out_path: str) -> None:
-    """Heatmap: rows=seeds, columns=methods, colour=held-out score."""
-    filtered = {
-        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-        for m in METHODS_MAIN
-    }
-    seeds_sorted = sorted(MAIN_SEEDS)
-    metrics_info = [
-        ("heldout_uniform_mean", "Mean Score"),
-        ("heldout_worst_band",   "Worst-Band Score"),
-    ]
-
-    fig, axes = plt.subplots(1, 2, figsize=(13, 6))
-
-    for ax, (metric, title) in zip(axes, metrics_info):
-        matrix = np.full((len(seeds_sorted), len(METHODS_MAIN)), np.nan)
-        for mi, m in enumerate(METHODS_MAIN):
-            scores = _scores_by_seed_metric(filtered[m], metric)
-            for si, seed in enumerate(seeds_sorted):
-                if seed in scores:
-                    matrix[si, mi] = scores[seed]
-
-        masked = np.ma.masked_invalid(matrix)
-        vmin = float(np.nanmin(matrix)) if not np.all(np.isnan(matrix)) else 0.0
-        vmax = float(np.nanmax(matrix)) if not np.all(np.isnan(matrix)) else 1.0
-
-        im = ax.imshow(masked, aspect="auto", cmap="RdYlGn", vmin=vmin, vmax=vmax)
-        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-        ax.set_xticks(range(len(METHODS_MAIN)))
-        ax.set_xticklabels([_METHOD_LABELS[m] for m in METHODS_MAIN],
-                           rotation=35, ha="right", fontsize=9)
-        ax.set_yticks(range(len(seeds_sorted)))
-        ax.set_yticklabels([str(s) for s in seeds_sorted], fontsize=8)
-        ax.set_ylabel("Seed", fontsize=10)
-        ax.set_title(title, fontsize=11)
-
-        mid = (vmax - vmin) / 2 + vmin if vmax > vmin else 0.5
-        for si in range(len(seeds_sorted)):
-            for mi in range(len(METHODS_MAIN)):
-                val = matrix[si, mi]
-                if not np.isnan(val):
-                    txt_color = "black" if abs(val - mid) < (vmax - vmin) * 0.25 else "white"
-                    ax.text(mi, si, f"{val:.3f}", ha="center", va="center",
-                            fontsize=6.5, color=txt_color)
-
-    fig.suptitle("Per-Seed Held-out Scores  (green = high, red = low)", fontsize=12)
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
-# ── Sensitivity table ─────────────────────────────────────────────────────────
-
-def compute_sensitivity_table(runs: list[dict]) -> pd.DataFrame:
-    rows = []
-    for metric in HELDOUT_METRICS:
-        for m in ["STATIC", "COEVOLVE"]:
-            for lam in SENSITIVITY_LAMBDAS:
-                subset = _select(runs, mode=m, seeds=SENS_SEEDS, lambda_weight=lam)
-                scores = list(_scores_by_seed_metric(subset, metric).values())
-                if scores:
-                    mean_h = float(np.mean(scores))
-                    std_h = float(np.std(scores, ddof=1)) if len(scores) > 1 else 0.0
-                else:
-                    mean_h = std_h = float("nan")
-                rows.append({
-                    "metric":        metric,
-                    "method":        m,
-                    "lambda_weight": lam,
-                    "mean":          mean_h,
-                    "std":           std_h,
-                })
-
-    return pd.DataFrame(rows)
 
 
 # ── Diagnostic table (COEVOLVE only) ──────────────────────────────────────────
@@ -1386,7 +1155,7 @@ def write_repertoire_report(
     with open(graph_train_path, "rb") as fh:
         graph_train = pickle.load(fh)
 
-    ga_methods = ["COEVOLVE", "COEVOLVE_FROZEN", "STATIC", "GREEDY_HILLCLIMB"]
+    ga_methods = ["COEVOLVE", "STATIC", "GREEDY_HILLCLIMB"]
     SEP  = "=" * 70
     HSEP = "#" * 70
 
@@ -1499,206 +1268,14 @@ def plot_closure_ablation(runs: list[dict], out_path: str) -> None:
     plt.close(fig)
 
 
-def plot_closure_threshold_sensitivity(runs: list[dict], out_path: str) -> None:
-    """Line plot: held-out score vs closure threshold for STATIC.
-
-    Shows whether CLOSURE_THRESHOLD = 0.15 is a good choice or if performance
-    changes significantly across the tested range.
-    """
-    metrics_info = [
-        ("heldout_uniform_mean", "Mean Score"),
-        ("heldout_worst_band",   "Worst-Band Score"),
-    ]
-    thresholds = CLOSURE_THRESHOLD_VALUES
-
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-
-    for ax, (metric, ylabel) in zip(axes, metrics_info):
-        means, stds = [], []
-        for thresh in thresholds:
-            # Threshold-sweep runs store the threshold in their config dict.
-            sel = [r for r in runs
-                   if r.get("mode") == "STATIC"
-                   and r.get("seed") in CLOSURE_THRESHOLD_SEEDS
-                   and abs(r.get("config", {}).get("closure_threshold", -1) - thresh) < 1e-6]
-            vals = list(_scores_by_seed_metric(sel, metric).values())
-            means.append(float(np.mean(vals)) if vals else float("nan"))
-            stds.append(float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0)
-
-        means_a = np.array(means)
-        stds_a  = np.array(stds)
-
-        if np.all(np.isnan(means_a)):
-            ax.text(0.5, 0.5, "No threshold sweep data yet", ha="center", va="center",
-                    transform=ax.transAxes, color="grey", fontsize=11)
-        else:
-            ax.plot(thresholds, means_a, "o-", color=_METHOD_COLORS["STATIC"],
-                    linewidth=2, markersize=7)
-            ax.fill_between(thresholds, means_a - stds_a, means_a + stds_a,
-                            alpha=0.15, color=_METHOD_COLORS["STATIC"])
-            # Mark the default value we used in main experiments.
-            ax.axvline(0.15, color="grey", linestyle=":", linewidth=1.2, alpha=0.7,
-                       label="Default (0.15)")
-            ax.legend(fontsize=9)
-
-        ax.set_xlabel("Closure Threshold", fontsize=11)
-        ax.set_ylabel(ylabel, fontsize=10.5)
-        ax.set_title(ylabel, fontsize=11)
-        ax.set_xticks(thresholds)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.grid(alpha=0.25)
-
-    fig.suptitle(
-        "Closure Threshold Sensitivity — STATIC GA  (shading = ±1 SD across 5 seeds)",
-        fontsize=11,
-    )
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_budget_sensitivity(runs: list[dict], out_path: str) -> None:
-    """Line plot: held-out score vs committed-move budget for STATIC.
-
-    Answers: does the 25-move budget saturate, or do larger budgets still improve?
-    """
-    metrics_info = [
-        ("heldout_uniform_mean", "Mean Score"),
-        ("heldout_worst_band",   "Worst-Band Score"),
-    ]
-    budgets = BUDGET_VALUES
-
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-
-    for ax, (metric, ylabel) in zip(axes, metrics_info):
-        means, stds = [], []
-        for bgt in budgets:
-            sel = [r for r in runs
-                   if r.get("mode") == "STATIC"
-                   and r.get("seed") in BUDGET_SEEDS
-                   and r.get("config", {}).get("budget") == bgt]
-            vals = list(_scores_by_seed_metric(sel, metric).values())
-            means.append(float(np.mean(vals)) if vals else float("nan"))
-            stds.append(float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0)
-
-        means_a = np.array(means)
-        stds_a  = np.array(stds)
-
-        if np.all(np.isnan(means_a)):
-            ax.text(0.5, 0.5, "No budget sweep data yet", ha="center", va="center",
-                    transform=ax.transAxes, color="grey", fontsize=11)
-        else:
-            ax.plot(budgets, means_a, "o-", color=_METHOD_COLORS["STATIC"],
-                    linewidth=2, markersize=7)
-            ax.fill_between(budgets, means_a - stds_a, means_a + stds_a,
-                            alpha=0.15, color=_METHOD_COLORS["STATIC"])
-            ax.axvline(BUDGET, color="grey", linestyle=":", linewidth=1.2, alpha=0.7,
-                       label=f"Default ({BUDGET})")
-            ax.legend(fontsize=9)
-
-        ax.set_xlabel("Budget (committed moves per color)", fontsize=11)
-        ax.set_ylabel(ylabel, fontsize=10.5)
-        ax.set_title(ylabel, fontsize=11)
-        ax.set_xticks(budgets)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.grid(alpha=0.25)
-
-    fig.suptitle(
-        "Budget Sensitivity — STATIC GA  (shading = ±1 SD across 5 seeds)",
-        fontsize=11,
-    )
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
-# ── Opening diversity table ───────────────────────────────────────────────────
-
-def compute_opening_diversity_table(runs: list[dict], graph_train: dict) -> pd.DataFrame:
-    """For each method, count how many seeds chose each first White move.
-
-    Uses the existing _opening_name_for lookup to label the opening family.
-    This answers: does COEVOLVE produce more diverse openings than STATIC?
-    """
-    nodes = graph_train["nodes"]
-    root_fen = graph_train["root_fen"]
-
-    rows = []
-    for m in METHODS_MAIN:
-        sel = _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-        for r in sel:
-            cand = r.get("final_best_candidate")
-            if cand is None:
-                continue
-            w_committed = cand.get("white_committed", {})
-            first_move_uci = w_committed.get(root_fen)
-            if first_move_uci is None:
-                continue
-            root_node = nodes.get(root_fen)
-            if root_node is None:
-                continue
-            child_info = root_node["children"].get(first_move_uci)
-            first_move_san = child_info["move_san"] if child_info else first_move_uci
-            opening = _opening_name_for([first_move_san])
-            rows.append({
-                "method":     m,
-                "seed":       r.get("seed"),
-                "first_move": first_move_san,
-                "opening":    opening,
-            })
-
-    if not rows:
-        return pd.DataFrame(columns=["method", "seed", "first_move", "opening"])
-
-    df = pd.DataFrame(rows)
-    # Pivot to a count table: rows = methods, columns = first moves.
-    pivot = df.groupby(["method", "first_move"]).size().unstack(fill_value=0)
-    pivot = pivot.reindex([m for m in METHODS_MAIN if m in pivot.index])
-    return pivot
-
-
-# ── Compute cost table ────────────────────────────────────────────────────────
-
-def compute_compute_cost_table(runs: list[dict]) -> pd.DataFrame:
-    """Wall-clock time per method, using the wall_time_seconds field in each run pickle.
-
-    Useful for an honest 'is this worth the compute?' answer in the paper.
-    """
-    rows = []
-    for m in METHODS_MAIN:
-        sel = _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-        times = [r["wall_time_seconds"] for r in sel if "wall_time_seconds" in r]
-        if not times:
-            continue
-        rows.append({
-            "method":        _METHOD_LABELS.get(m, m),
-            "median_sec":    float(np.median(times)),
-            "mean_sec":      float(np.mean(times)),
-            "std_sec":       float(np.std(times, ddof=1)) if len(times) > 1 else 0.0,
-            "median_min":    float(np.median(times)) / 60,
-        })
-    return pd.DataFrame(rows)
-
-
 # ── Top-level entry point ─────────────────────────────────────────────────────
 
 def run_analysis(
     runs_dir: str = "runs",
     results_dir: str = "results",
-    include_appendix: bool = False,
 ) -> None:
-    """Run the full analysis pipeline.
-
-    Core outputs are always produced. Appendix outputs (diagnostic plots,
-    sensitivity tables, etc.) are only produced when include_appendix=True.
-    Pass include_appendix=True for the final paper submission.
-    """
+    """Run the full analysis pipeline and write all outputs to results_dir."""
     Path(results_dir).mkdir(parents=True, exist_ok=True)
-    appendix_dir = os.path.join(results_dir, "appendix")
-    if include_appendix:
-        Path(appendix_dir).mkdir(parents=True, exist_ok=True)
 
     print(f"Loading runs from '{runs_dir}' ...")
     runs = load_runs(runs_dir)
@@ -1708,7 +1285,6 @@ def run_analysis(
     _augment_runs_with_metrics(runs)
     print("  done.\n")
 
-    # ── Core: main comparison table ───────────────────────────────────────────
     print("Computing main_table.csv ...")
     main_df = compute_main_table(runs)
     main_df.to_csv(os.path.join(results_dir, "main_table.csv"), index=False)
@@ -1716,7 +1292,6 @@ def run_analysis(
         print(f"\n[{metric}]")
         print(sub.drop(columns=["metric"]).to_string(index=False))
 
-    # ── Core: headline figures ────────────────────────────────────────────────
     print("\nPlotting convergence.png ...")
     plot_convergence(runs, os.path.join(results_dir, "convergence.png"))
     print("  saved.")
@@ -1729,96 +1304,40 @@ def run_analysis(
     plot_band_breakdown(runs, os.path.join(results_dir, "band_breakdown.png"))
     print("  saved.")
 
-    # ── Core: new ablation + sensitivity plots ────────────────────────────────
     print("\nPlotting closure_ablation.png ...")
     plot_closure_ablation(runs, os.path.join(results_dir, "closure_ablation.png"))
     print("  saved.")
 
-    print("\nPlotting closure_threshold.png ...")
-    plot_closure_threshold_sensitivity(runs, os.path.join(results_dir, "closure_threshold.png"))
+    print("\nPlotting white_black_breakdown.png ...")
+    plot_white_black_breakdown(runs, os.path.join(results_dir, "white_black_breakdown.png"))
     print("  saved.")
 
-    print("\nPlotting budget_sensitivity.png ...")
-    plot_budget_sensitivity(runs, os.path.join(results_dir, "budget_sensitivity.png"))
+    print("\nPlotting ga_vs_nonga.png ...")
+    plot_ga_vs_nonga(runs, os.path.join(results_dir, "ga_vs_nonga.png"))
     print("  saved.")
 
-    # ── Core: post-hoc tables (no new runs needed) ────────────────────────────
-    # Opening diversity: which first move did each method choose across seeds?
-    graph_train_path = os.path.join("data", "graph_train.pkl")
-    if os.path.exists(graph_train_path):
-        print("\nComputing opening_diversity.csv ...")
-        with open(graph_train_path, "rb") as fh:
-            import pickle as _pkl
-            _graph = _pkl.load(fh)
-        div_df = compute_opening_diversity_table(runs, _graph)
-        div_df.to_csv(os.path.join(results_dir, "opening_diversity.csv"))
-        print(div_df.to_string())
-    else:
-        print("\n  [skip] opening_diversity: graph_train.pkl not found.")
+    print("\nPlotting repertoire_structure.png ...")
+    plot_repertoire_structure(runs, os.path.join(results_dir, "repertoire_structure.png"))
+    print("  saved.")
 
-    print("\nComputing compute_cost.csv ...")
-    cost_df = compute_compute_cost_table(runs)
-    cost_df.to_csv(os.path.join(results_dir, "compute_cost.csv"), index=False)
-    print(cost_df.to_string(index=False))
+    print("\nPlotting coevolve_dynamics.png ...")
+    plot_coevolve_dynamics(runs, os.path.join(results_dir, "coevolve_dynamics.png"))
+    print("  saved.")
 
-    # ── Appendix: diagnostic and supplementary plots ──────────────────────────
-    if include_appendix:
-        out = appendix_dir
+    print("\nComputing diagnostic_table.csv ...")
+    diag_df = compute_diagnostic_table(runs)
+    diag_df.to_csv(os.path.join(results_dir, "diagnostic_table.csv"), index=False)
+    print(diag_df.to_string(index=False))
 
-        print("\n[appendix] Plotting effect_sizes.png ...")
-        plot_effect_sizes(runs, os.path.join(out, "effect_sizes.png"))
+    print("\nWriting repertoire_tree.txt + repertoire_grouped.txt ...")
+    write_repertoire_report(runs, results_dir)
 
-        print("[appendix] Plotting ga_vs_nonga.png ...")
-        plot_ga_vs_nonga(runs, os.path.join(out, "ga_vs_nonga.png"))
-
-        print("[appendix] Plotting white_black_breakdown.png ...")
-        plot_white_black_breakdown(runs, os.path.join(out, "white_black_breakdown.png"))
-
-        print("[appendix] Plotting generalization.png ...")
-        plot_generalization(runs, os.path.join(out, "generalization.png"))
-
-        print("[appendix] Plotting generalization_gap.png ...")
-        plot_generalization_gap(runs, os.path.join(out, "generalization_gap.png"))
-
-        print("[appendix] Plotting repertoire_structure.png ...")
-        plot_repertoire_structure(runs, os.path.join(out, "repertoire_structure.png"))
-
-        print("[appendix] Plotting lambda_sensitivity.png ...")
-        plot_lambda_sensitivity_visual(runs, os.path.join(out, "lambda_sensitivity.png"))
-
-        print("[appendix] Plotting coevolve_dynamics.png ...")
-        plot_coevolve_dynamics(runs, os.path.join(out, "coevolve_dynamics.png"))
-
-        print("[appendix] Plotting seed_heatmap.png ...")
-        plot_seed_heatmap(runs, os.path.join(out, "seed_heatmap.png"))
-
-        print("[appendix] Computing sensitivity_table.csv ...")
-        sens_df = compute_sensitivity_table(runs)
-        sens_df.to_csv(os.path.join(out, "sensitivity_table.csv"), index=False)
-        print(sens_df.to_string(index=False))
-
-        print("[appendix] Computing diagnostic_table.csv ...")
-        diag_df = compute_diagnostic_table(runs)
-        diag_df.to_csv(os.path.join(out, "diagnostic_table.csv"), index=False)
-        print(diag_df.to_string(index=False))
-
-        print("[appendix] Writing repertoire_tree.txt + repertoire_grouped.txt ...")
-        write_repertoire_report(runs, out)
-
-        print(f"  Appendix outputs saved to '{appendix_dir}/'.")
-
-    print(f"\nDone — results saved to '{results_dir}/'.")
-
+    print(f"\nDone - results saved to '{results_dir}'.")
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run ChessRepertoire analysis")
-    parser.add_argument("--runs-dir",  default="runs",    help="Directory with run pickles")
+    parser.add_argument("--runs-dir",    default="runs",    help="Directory with run pickles")
     parser.add_argument("--results-dir", default="results", help="Output directory")
-    parser.add_argument("--appendix", action="store_true", help="Also produce appendix figures")
     args = parser.parse_args()
-    run_analysis(
-        runs_dir=args.runs_dir,
-        results_dir=args.results_dir,
-        include_appendix=args.appendix,
-    )
+    run_analysis(runs_dir=args.runs_dir, results_dir=args.results_dir)
