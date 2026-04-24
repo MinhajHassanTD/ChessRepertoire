@@ -5,6 +5,10 @@
 __pycache__/
 .pytest_cache/
 *.pyc
+runs/
+results/
+data/*.db
+data/*.pkl
 
 # Claude internal
 .claude/

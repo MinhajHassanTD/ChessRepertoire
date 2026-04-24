@@ -125,6 +125,7 @@ def run_baseline(
     graph_heldout: dict,
     base_policies_train: dict,
     eval_cache_heldout: dict,
+    eval_cache_train: dict | None = None,
 ) -> dict:
     """Greedy most-played-move baseline (no GA), evaluated on held-out."""
     start_time = time.time()
@@ -137,6 +138,17 @@ def run_baseline(
                           fitness=None, band_scores_cache=None)
 
     config = {'lambda_weight': run['lambda_weight'], 'alpha': run['alpha']}
+
+    training_fitness = None
+    if eval_cache_train is not None:
+        # Keep a comparable scalar to other methods for convergence plotting.
+        training_fitness = _eval_candidate(
+            candidate,
+            config,
+            eval_cache_train,
+            base_policies_train,
+            graph_train,
+        )
 
     heldout_score = evaluate_heldout(
         candidate,
@@ -155,7 +167,7 @@ def run_baseline(
         'git_commit': git_commit,
         'history': [],
         'final_best_candidate': serialize_candidate(candidate),
-        'final_training_fitness': None,
+        'final_training_fitness': training_fitness,
         'heldout_score': heldout_score,
         'wall_time_seconds': elapsed,
     }
@@ -340,6 +352,7 @@ def run_all(
                 graph_heldout,
                 base_policies_train,
                 eval_cache_heldout,
+                eval_cache_train=eval_cache_train,
             )
         elif method == 'RANDOM_SEARCH':
             result = run_random_search(

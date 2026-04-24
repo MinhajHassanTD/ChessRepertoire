@@ -64,9 +64,11 @@ HELDOUT_METRICS = [
 ]
 
 _CONVERGENCE_COLORS = {
+    "most_played_baseline": "dimgray",
     "STATIC": "steelblue",
     "COEVOLVE_FROZEN": "darkorange",
     "COEVOLVE": "forestgreen",
+    "RANDOM_SEARCH": "firebrick",
     "GREEDY_HILLCLIMB": "purple",
 }
 
@@ -310,20 +312,48 @@ def compute_main_table(runs: list[dict]) -> pd.DataFrame:
 def plot_convergence(runs: list[dict], out_path: str) -> None:
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    for m in ["STATIC", "COEVOLVE_FROZEN", "COEVOLVE"]:
-        m_runs = [
-            r for r in _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-            if r["history"]
-        ]
-        if not m_runs:
+    method_order = [
+        "most_played_baseline",
+        "STATIC",
+        "COEVOLVE_FROZEN",
+        "COEVOLVE",
+        "RANDOM_SEARCH",
+        "GREEDY_HILLCLIMB",
+    ]
+
+    # Use GA runs to set a common generation axis for flat baseline curves.
+    ga_lengths = [
+        len(r["history"])
+        for m in ["STATIC", "COEVOLVE_FROZEN", "COEVOLVE"]
+        for r in _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        if r["history"]
+    ]
+    default_n_gens = max(ga_lengths) if ga_lengths else 1
+
+    for m in method_order:
+        selected = _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        if not selected:
             continue
 
-        n_gens = len(m_runs[0]["history"])
-        matrix = np.array([
-            [h["best_training_fitness"] for h in r["history"]]
-            for r in m_runs
-            if len(r["history"]) == n_gens
-        ])
+        history_runs = [r for r in selected if r["history"]]
+        if history_runs:
+            n_gens = len(history_runs[0]["history"])
+            matrix = np.array([
+                [h["best_training_fitness"] for h in r["history"]]
+                for r in history_runs
+                if len(r["history"]) == n_gens
+            ])
+        else:
+            scalar_vals = [
+                float(r["final_training_fitness"])
+                for r in selected
+                if r.get("final_training_fitness") is not None
+            ]
+            if not scalar_vals:
+                continue
+            n_gens = default_n_gens
+            matrix = np.repeat(np.array(scalar_vals)[:, None], n_gens, axis=1)
+
         if matrix.ndim != 2 or matrix.shape[0] == 0:
             continue
 
