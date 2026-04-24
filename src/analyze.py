@@ -5,25 +5,14 @@ Core outputs (results/):
     main_table.csv              — one row per (metric, method): mean/std, Wilcoxon p,
                                   A12 effect size (all vs STATIC as reference)
     convergence.png             — GA training curves with 95% CI across seeds
-    score_distributions.png     — box + strip for both held-out metrics, all 4 methods
+    score_distributions.png     — box + strip for both held-out metrics, all methods
     band_breakdown.png          — per-rating-band score grouped by method
-    closure_ablation.png        — closure ON vs OFF for STATIC and COEVOLVE (new)
-    closure_threshold.png       — held-out score vs threshold value (new)
-    budget_sensitivity.png      — held-out score vs budget size (new)
-    opening_diversity.csv       — first-move distribution per method (new)
-    compute_cost.csv            — wall time per method (new)
+    closure_ablation.png        — closure ON vs OFF for STATIC and COEVOLVE
 
 Appendix outputs (only when include_appendix=True):
-    effect_sizes.png            — horizontal A12 bars vs Static GA
     ga_vs_nonga.png             — Non-GA / GA groups separated and sorted
-    white_black_breakdown.png   — white vs black performance per method
-    generalization.png          — scatter: training fitness vs held-out score
-    generalization_gap.png      — bar: training − held-out per method
     repertoire_structure.png    — committed moves + subgraph size per method
-    lambda_sensitivity.png      — held-out score vs lambda value
     coevolve_dynamics.png       — COEVOLVE internal dynamics (3-panel)
-    seed_heatmap.png            — per-seed scores as a heatmap
-    sensitivity_table.csv       — lambda sensitivity results
     diagnostic_table.csv        — COEVOLVE per-generation averages
     repertoire_tree.txt         — best candidate per GA mode as a decision tree
     repertoire_grouped.txt      — best candidate grouped by opening family
@@ -46,22 +35,14 @@ from scipy import stats
 from src.fitness import BANDS, walk
 from src.config import (
     MAIN_SEEDS,
-    SENSITIVITY_SEEDS,
     CLOSURE_ABLATION_SEEDS,
-    CLOSURE_THRESHOLD_VALUES,
-    CLOSURE_THRESHOLD_SEEDS,
-    BUDGET_VALUES,
-    BUDGET_SEEDS,
     MAIN_LAMBDA,
-    SENSITIVITY_LAMBDAS,
     BUDGET,
 )
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-# Core 4 methods for the main paper comparison. RANDOM_SEARCH and COEVOLVE_FROZEN
-# are excluded from main-text figures — they're in the 120 runs but tell a muddier story.
 METHODS_MAIN = [
     "most_played_baseline",  # human heuristic baseline
     "GREEDY_HILLCLIMB",      # non-GA search baseline (same eval budget as GA)
@@ -69,8 +50,6 @@ METHODS_MAIN = [
     "COEVOLVE",              # GA with co-evolving opponent population
 ]
 NON_STATIC_METHODS = [m for m in METHODS_MAIN if m != "STATIC"]
-
-SENS_SEEDS = SENSITIVITY_SEEDS
 
 HELDOUT_METRICS = [
     "heldout_uniform_mean",   # average win-rate across all 3 bands under uniform opponent
@@ -82,10 +61,9 @@ HELDOUT_METRICS = [
 # Wong colorblind-safe palette — works in greyscale and for common colour-blindness types.
 _METHOD_COLORS = {
     "most_played_baseline":   "#999999",  # grey
-    "RANDOM_SEARCH":          "#E69F00",  # orange (appendix only)
+    "RANDOM_SEARCH":          "#E69F00",  # orange
     "GREEDY_HILLCLIMB":       "#56B4E9",  # sky blue
     "STATIC":                 "#009E73",  # green
-    "COEVOLVE_FROZEN":        "#F0E442",  # yellow (appendix only)
     "COEVOLVE":               "#0072B2",  # blue
     # No-closure ablation variants get lighter versions of their parent's colour.
     "STATIC_NOCLOSURE":       "#66C2A5",  # light green
@@ -97,7 +75,6 @@ _METHOD_LABELS = {
     "RANDOM_SEARCH":          "Rand. Search",
     "GREEDY_HILLCLIMB":       "Hill-climb",
     "STATIC":                 "Static GA",
-    "COEVOLVE_FROZEN":        "Frozen CoEvo",
     "COEVOLVE":               "CoEvolve",
     "STATIC_NOCLOSURE":       "Static (no closure)",
     "COEVOLVE_NOCLOSURE":     "CoEvolve (no closure)",
@@ -515,67 +492,6 @@ def plot_band_breakdown(runs: list[dict], out_path: str) -> None:
     all_vals = means[~np.isnan(means)]
     if len(all_vals):
         ax.set_ylim(max(0.0, all_vals.min() - 0.04), min(1.0, all_vals.max() + 0.04))
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_effect_sizes(runs: list[dict], out_path: str) -> None:
-    """Horizontal bar chart of A12 effect sizes vs Static GA for both metrics."""
-    compare_methods = [m for m in METHODS_MAIN if m != "STATIC"]
-    metrics_info = [
-        ("heldout_uniform_mean", "Mean Score"),
-        ("heldout_worst_band",   "Worst-Band Score"),
-    ]
-    filtered = {
-        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-        for m in METHODS_MAIN
-    }
-    static_map = {
-        metric: _scores_by_seed_metric(filtered["STATIC"], metric)
-        for metric, _ in metrics_info
-    }
-
-    fig, axes = plt.subplots(1, 2, figsize=(10, 3.5), sharey=True)
-
-    for ax, (metric, title) in zip(axes, metrics_info):
-        static_by_seed = static_map[metric]
-        a12s, labels, colors = [], [], []
-        for m in compare_methods:
-            m_scores = _scores_by_seed_metric(filtered[m], metric)
-            shared   = sorted(set(m_scores) & set(static_by_seed))
-            if len(shared) < 2:
-                continue
-            x = [m_scores[s] for s in shared]
-            y = [static_by_seed[s] for s in shared]
-            a12s.append(_a12(x, y))
-            labels.append(_METHOD_LABELS[m])
-            colors.append(_METHOD_COLORS[m])
-
-        y_pos = np.arange(len(a12s))
-        ax.barh(
-            y_pos, [v - 0.5 for v in a12s], left=0.5,
-            color=colors, alpha=0.75, height=0.55,
-        )
-        ax.axvline(0.5, color="black", linewidth=1.5)
-        ax.axvline(0.56, color="gray", linewidth=0.8, linestyle=":", alpha=0.6)
-        ax.axvline(0.44, color="gray", linewidth=0.8, linestyle=":", alpha=0.6)
-        ax.set_yticks(y_pos)
-        ax.set_yticklabels(labels, fontsize=10)
-        ax.set_xlim(0.3, 0.7)
-        ax.set_xlabel("A12 vs Static GA", fontsize=10)
-        ax.set_title(title, fontsize=11)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        for i, val in enumerate(a12s):
-            offset = 0.004 if val >= 0.5 else -0.004
-            ha     = "left" if val >= 0.5 else "right"
-            ax.text(val + offset, i, f"{val:.2f}", va="center", ha=ha, fontsize=9)
-
-    fig.suptitle(
-        "Effect Size vs Static GA  (A12 > 0.5 = better than Static, dotted = small-effect boundary ±0.06)",
-        fontsize=10,
-    )
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
