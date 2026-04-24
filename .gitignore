@@ -5,8 +5,10 @@
 __pycache__/
 .pytest_cache/
 *.pyc
-runs/
-results/
+runs/*.pkl
+results/*.png
+results/*.csv
+results/*.txt
 data/*.db
 data/*.pkl
 
