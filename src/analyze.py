@@ -30,10 +30,7 @@ from src.config import (
     SENSITIVITY_SEEDS,
     MAIN_LAMBDA,
     SENSITIVITY_LAMBDAS,
-    ADVERSARIAL_RNG_SEED,
-    ADVERSARIAL_N_SAMPLES,
-    ADVERSARIAL_DIRICHLET_ALPHA,
-    ADVERSARIAL_QUANTILE,
+    BUDGET,
 )
 
 
@@ -57,20 +54,39 @@ NON_STATIC_METHODS = [
 SENS_SEEDS = SENSITIVITY_SEEDS
 
 HELDOUT_METRICS = [
-    "heldout_uniform_mean",       # mean score under uniform mixture
-    "heldout_worst_band",         # min over the N bands (CVaR α=1/N)
-    "heldout_adversarial_q10",    # 10th-pct mean over Dirichlet mixtures
-    "heldout_uniform_fitness",    # mean + λ·cvar (legacy heldout_score)
+    "heldout_uniform_mean",   # average win-rate across all 3 bands under uniform opponent
+    "heldout_worst_band",     # win-rate against the hardest band (robustness / CVaR)
 ]
 
-_CONVERGENCE_COLORS = {
-    "most_played_baseline": "dimgray",
-    "STATIC": "steelblue",
-    "COEVOLVE_FROZEN": "darkorange",
-    "COEVOLVE": "forestgreen",
-    "RANDOM_SEARCH": "firebrick",
-    "GREEDY_HILLCLIMB": "purple",
+# ── Display constants ─────────────────────────────────────────────────────────
+
+# Wong colorblind-friendly palette
+_METHOD_COLORS = {
+    "most_played_baseline": "#999999",
+    "RANDOM_SEARCH":        "#E69F00",
+    "GREEDY_HILLCLIMB":     "#56B4E9",
+    "STATIC":               "#009E73",
+    "COEVOLVE_FROZEN":      "#F0E442",
+    "COEVOLVE":             "#0072B2",
 }
+
+_METHOD_LABELS = {
+    "most_played_baseline": "Most Played",
+    "RANDOM_SEARCH":        "Rand. Search",
+    "GREEDY_HILLCLIMB":     "Hill-climb",
+    "STATIC":               "Static GA",
+    "COEVOLVE_FROZEN":      "Frozen CoEvo",
+    "COEVOLVE":             "CoEvolve",
+}
+
+_BAND_COLORS = ["#d62728", "#ff7f0e", "#1f77b4"]   # red, orange, blue per band
+_BAND_LABELS = {
+    "1000-1399": "1000–1399",
+    "1400-1799": "1400–1799",
+    "1800-2199": "1800–2199",
+}
+
+GA_METHODS_CONV = ["STATIC", "COEVOLVE_FROZEN", "COEVOLVE"]
 
 
 # ── I/O ───────────────────────────────────────────────────────────────────────
@@ -164,25 +180,28 @@ def _compute_heldout_metrics(
     base_policies_train: dict,
     graph_heldout: dict,
     lambda_weight: float,
-) -> dict[str, float]:
-    bs = _band_scores_heldout(candidate_ser, eval_cache_heldout, base_policies_train, graph_heldout)
-    band_vec = np.array([bs[b] for b in BANDS])
+) -> dict:
+    white = _FrozenRep("white", candidate_ser["white_committed"], candidate_ser["white_reached"])
+    black = _FrozenRep("black", candidate_ser["black_committed"], candidate_ser["black_reached"])
 
-    uniform_mean = float(band_vec.mean())
-    worst_band = float(band_vec.min())
+    band_scores, white_band_scores, black_band_scores = {}, {}, {}
+    for band in BANDS:
+        w_ws = walk(white, band, eval_cache_heldout, base_policies_train, graph_heldout)
+        b_ws = walk(black, band, eval_cache_heldout, base_policies_train, graph_heldout)
+        b_score = 1.0 - b_ws
+        white_band_scores[band] = float(w_ws)
+        black_band_scores[band] = float(b_score)
+        band_scores[band]       = 0.5 * w_ws + 0.5 * b_score
 
-    rng = np.random.default_rng(ADVERSARIAL_RNG_SEED)
-    mixtures = rng.dirichlet(np.full(len(BANDS), ADVERSARIAL_DIRICHLET_ALPHA), size=ADVERSARIAL_N_SAMPLES)
-    sampled_means = mixtures @ band_vec
-    adversarial_q10 = float(np.quantile(sampled_means, ADVERSARIAL_QUANTILE))
-
-    uniform_fitness = uniform_mean + lambda_weight * worst_band
-
+    band_vec = np.array([band_scores[b] for b in BANDS])
     return {
-        "heldout_uniform_mean":     uniform_mean,
-        "heldout_worst_band":       worst_band,
-        "heldout_adversarial_q10":  adversarial_q10,
-        "heldout_uniform_fitness":  uniform_fitness,
+        "heldout_uniform_mean": float(band_vec.mean()),
+        "heldout_worst_band":   float(band_vec.min()),
+        "band_scores":          {b: float(band_scores[b])       for b in BANDS},
+        "white_band_scores":    white_band_scores,
+        "black_band_scores":    black_band_scores,
+        "white_mean":           float(np.mean([white_band_scores[b] for b in BANDS])),
+        "black_mean":           float(np.mean([black_band_scores[b] for b in BANDS])),
     }
 
 
@@ -197,14 +216,16 @@ def _load_heldout_artifacts(data_dir: str = "data"):
 
 
 def _augment_runs_with_metrics(runs: list[dict], data_dir: str = "data") -> None:
-    if all("heldout_metrics" in r for r in runs):
+    # Recompute for any run that is missing heldout_metrics or the per-band breakdown.
+    needs = [
+        r for r in runs
+        if "final_best_candidate" in r
+        and "white_band_scores" not in r.get("heldout_metrics", {})
+    ]
+    if not needs:
         return
     graph_heldout, eval_cache_heldout, base_policies_train = _load_heldout_artifacts(data_dir)
-    for r in runs:
-        if "heldout_metrics" in r:
-            continue
-        if "final_best_candidate" not in r:
-            continue
+    for r in needs:
         lam = float(r["config"].get("lambda_weight", MAIN_LAMBDA))
         r["heldout_metrics"] = _compute_heldout_metrics(
             r["final_best_candidate"],
@@ -310,69 +331,703 @@ def compute_main_table(runs: list[dict]) -> pd.DataFrame:
 # ── Convergence plot ──────────────────────────────────────────────────────────
 
 def plot_convergence(runs: list[dict], out_path: str) -> None:
-    fig, ax = plt.subplots(figsize=(8, 5))
+    """GA methods only — clean convergence curves with 95% CI bands."""
+    fig, ax = plt.subplots(figsize=(7, 4))
 
-    method_order = [
-        "most_played_baseline",
-        "STATIC",
-        "COEVOLVE_FROZEN",
-        "COEVOLVE",
-        "RANDOM_SEARCH",
-        "GREEDY_HILLCLIMB",
-    ]
-
-    # Use GA runs to set a common generation axis for flat baseline curves.
-    ga_lengths = [
-        len(r["history"])
-        for m in ["STATIC", "COEVOLVE_FROZEN", "COEVOLVE"]
-        for r in _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-        if r["history"]
-    ]
-    default_n_gens = max(ga_lengths) if ga_lengths else 1
-
-    for m in method_order:
+    for m in GA_METHODS_CONV:
         selected = _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
-        if not selected:
+        history_runs = [r for r in selected if r.get("history")]
+        if not history_runs:
             continue
-
-        history_runs = [r for r in selected if r["history"]]
-        if history_runs:
-            n_gens = len(history_runs[0]["history"])
-            matrix = np.array([
-                [h["best_training_fitness"] for h in r["history"]]
-                for r in history_runs
-                if len(r["history"]) == n_gens
-            ])
-        else:
-            scalar_vals = [
-                float(r["final_training_fitness"])
-                for r in selected
-                if r.get("final_training_fitness") is not None
-            ]
-            if not scalar_vals:
-                continue
-            n_gens = default_n_gens
-            matrix = np.repeat(np.array(scalar_vals)[:, None], n_gens, axis=1)
-
+        n_gens = len(history_runs[0]["history"])
+        matrix = np.array([
+            [h["best_training_fitness"] for h in r["history"]]
+            for r in history_runs
+            if len(r["history"]) == n_gens
+        ])
         if matrix.ndim != 2 or matrix.shape[0] == 0:
             continue
-
-        gens = np.arange(n_gens)
+        gens  = np.arange(n_gens)
         mean_f = np.mean(matrix, axis=0)
-        n = matrix.shape[0]
-        se = np.std(matrix, axis=0, ddof=1) / np.sqrt(n) if n > 1 else np.zeros(n_gens)
-        ci = 1.96 * se
+        n     = matrix.shape[0]
+        se    = np.std(matrix, axis=0, ddof=1) / np.sqrt(n) if n > 1 else np.zeros(n_gens)
+        ci    = 1.96 * se
+        color = _METHOD_COLORS[m]
+        ax.plot(gens, mean_f, label=_METHOD_LABELS[m], color=color, linewidth=2)
+        ax.fill_between(gens, mean_f - ci, mean_f + ci, alpha=0.15, color=color)
 
-        color = _CONVERGENCE_COLORS.get(m, "black")
-        ax.plot(gens, mean_f, label=m, color=color)
-        ax.fill_between(gens, mean_f - ci, mean_f + ci, alpha=0.2, color=color)
-
-    ax.set_xlabel("Generation")
-    ax.set_ylabel("Best Training Fitness")
-    ax.set_title("Convergence (95% CI across seeds)")
-    ax.legend()
+    ax.set_xlabel("Generation", fontsize=12)
+    ax.set_ylabel("Best Training Fitness", fontsize=12)
+    ax.set_title("Training Convergence — GA Methods  (95% CI across seeds)", fontsize=12)
+    ax.legend(fontsize=10, framealpha=0.9)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_score_distributions(runs: list[dict], out_path: str) -> None:
+    """Box + individual-seed strip plots for the two held-out metrics, side by side."""
+    metrics_info = [
+        ("heldout_uniform_mean", "Mean Score\n(uniform opponent)",  "(a)"),
+        ("heldout_worst_band",   "Worst-Band Score\n(robustness)", "(b)"),
+    ]
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), sharey=False)
+    rng_j = np.random.default_rng(0)
+
+    for ax, (metric, ylabel, panel) in zip(axes, metrics_info):
+        all_data, positions, colors, labels = [], [], [], []
+        for i, m in enumerate(METHODS_MAIN):
+            vals = list(_scores_by_seed_metric(filtered[m], metric).values())
+            if not vals:
+                continue
+            all_data.append(vals)
+            positions.append(i)
+            colors.append(_METHOD_COLORS[m])
+            labels.append(_METHOD_LABELS[m])
+
+        bp = ax.boxplot(
+            all_data,
+            positions=positions,
+            widths=0.45,
+            patch_artist=True,
+            medianprops={"color": "black", "linewidth": 2},
+            whiskerprops={"linewidth": 1.2},
+            capprops={"linewidth": 1.2},
+            showfliers=False,
+        )
+        for patch, c in zip(bp["boxes"], colors):
+            patch.set_facecolor(c)
+            patch.set_alpha(0.45)
+
+        for pos, vals, c in zip(positions, all_data, colors):
+            jitter = rng_j.uniform(-0.15, 0.15, len(vals))
+            ax.scatter(
+                [pos + j for j in jitter], vals,
+                color=c, s=28, alpha=0.85, zorder=4,
+                edgecolors="white", linewidths=0.4,
+            )
+
+        ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.35)
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=9.5)
+        ax.set_ylabel(ylabel, fontsize=10.5)
+        ax.set_title(f"{panel} {ylabel.replace(chr(10), ' ')}", fontsize=11)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", alpha=0.25)
+
+    fig.suptitle(
+        "Held-out Score Distributions Across Seeds  (dashed = random play 0.5)",
+        fontsize=12,
+    )
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_band_breakdown(runs: list[dict], out_path: str) -> None:
+    """Grouped bar chart: held-out score per rating band, per method."""
+    bands = list(BANDS)
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+
+    n_m = len(METHODS_MAIN)
+    n_b = len(bands)
+    means = np.full((n_m, n_b), np.nan)
+    stds  = np.full((n_m, n_b), np.nan)
+
+    for mi, m in enumerate(METHODS_MAIN):
+        for bi, band in enumerate(bands):
+            vals = [
+                r["heldout_metrics"]["band_scores"][band]
+                for r in filtered[m]
+                if "band_scores" in r.get("heldout_metrics", {})
+            ]
+            if vals:
+                means[mi, bi] = np.mean(vals)
+                stds[mi, bi]  = np.std(vals, ddof=1) if len(vals) > 1 else 0.0
+
+    fig, ax = plt.subplots(figsize=(11, 4.5))
+    x      = np.arange(n_m)
+    width  = 0.25
+    offsets = np.array([-width, 0.0, width])
+
+    for bi, (band, color) in enumerate(zip(bands, _BAND_COLORS)):
+        mask = ~np.isnan(means[:, bi])
+        ax.bar(
+            x[mask] + offsets[bi],
+            means[mask, bi],
+            width=width,
+            yerr=stds[mask, bi],
+            label=_BAND_LABELS[band],
+            color=color,
+            alpha=0.75,
+            capsize=3,
+            error_kw={"linewidth": 1.2},
+        )
+
+    ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.35)
+    ax.set_xticks(x)
+    ax.set_xticklabels(
+        [_METHOD_LABELS[m] for m in METHODS_MAIN], rotation=25, ha="right", fontsize=10
+    )
+    ax.set_ylabel("Held-out Mean Score", fontsize=11)
+    ax.set_title("Per-Band Performance by Method  (error bars = ±1 SD)", fontsize=12)
+    ax.legend(title="Rating Band", fontsize=10, framealpha=0.9)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(axis="y", alpha=0.25)
+    all_vals = means[~np.isnan(means)]
+    if len(all_vals):
+        ax.set_ylim(max(0.0, all_vals.min() - 0.04), min(1.0, all_vals.max() + 0.04))
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_effect_sizes(runs: list[dict], out_path: str) -> None:
+    """Horizontal bar chart of A12 effect sizes vs Static GA for both metrics."""
+    compare_methods = [m for m in METHODS_MAIN if m != "STATIC"]
+    metrics_info = [
+        ("heldout_uniform_mean", "Mean Score"),
+        ("heldout_worst_band",   "Worst-Band Score"),
+    ]
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+    static_map = {
+        metric: _scores_by_seed_metric(filtered["STATIC"], metric)
+        for metric, _ in metrics_info
+    }
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 3.5), sharey=True)
+
+    for ax, (metric, title) in zip(axes, metrics_info):
+        static_by_seed = static_map[metric]
+        a12s, labels, colors = [], [], []
+        for m in compare_methods:
+            m_scores = _scores_by_seed_metric(filtered[m], metric)
+            shared   = sorted(set(m_scores) & set(static_by_seed))
+            if len(shared) < 2:
+                continue
+            x = [m_scores[s] for s in shared]
+            y = [static_by_seed[s] for s in shared]
+            a12s.append(_a12(x, y))
+            labels.append(_METHOD_LABELS[m])
+            colors.append(_METHOD_COLORS[m])
+
+        y_pos = np.arange(len(a12s))
+        ax.barh(
+            y_pos, [v - 0.5 for v in a12s], left=0.5,
+            color=colors, alpha=0.75, height=0.55,
+        )
+        ax.axvline(0.5, color="black", linewidth=1.5)
+        ax.axvline(0.56, color="gray", linewidth=0.8, linestyle=":", alpha=0.6)
+        ax.axvline(0.44, color="gray", linewidth=0.8, linestyle=":", alpha=0.6)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(labels, fontsize=10)
+        ax.set_xlim(0.3, 0.7)
+        ax.set_xlabel("A12 vs Static GA", fontsize=10)
+        ax.set_title(title, fontsize=11)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        for i, val in enumerate(a12s):
+            offset = 0.004 if val >= 0.5 else -0.004
+            ha     = "left" if val >= 0.5 else "right"
+            ax.text(val + offset, i, f"{val:.2f}", va="center", ha=ha, fontsize=9)
+
+    fig.suptitle(
+        "Effect Size vs Static GA  (A12 > 0.5 = better than Static, dotted = small-effect boundary ±0.06)",
+        fontsize=10,
+    )
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ── GA vs Non-GA comparison ───────────────────────────────────────────────────
+
+def plot_ga_vs_nonga(runs: list[dict], out_path: str) -> None:
+    """Bar chart: methods sorted by score within Non-GA / GA groups."""
+    from matplotlib.patches import Patch
+
+    NGA = ["most_played_baseline", "RANDOM_SEARCH", "GREEDY_HILLCLIMB"]
+    GA  = ["STATIC", "COEVOLVE_FROZEN", "COEVOLVE"]
+    metrics_info = [
+        ("heldout_uniform_mean", "Mean Score (uniform opponent)"),
+        ("heldout_worst_band",   "Worst-Band Score (robustness)"),
+    ]
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+
+    def _mean_std(m, metric):
+        vals = list(_scores_by_seed_metric(filtered[m], metric).values())
+        if not vals:
+            return float("nan"), 0.0
+        return float(np.mean(vals)), float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    GAP = 0.8
+
+    for ax, (metric, ylabel) in zip(axes, metrics_info):
+        nga_sorted = sorted(NGA, key=lambda m: _mean_std(m, metric)[0])
+        ga_sorted  = sorted(GA,  key=lambda m: _mean_std(m, metric)[0])
+
+        positions = {}
+        for i, m in enumerate(nga_sorted):
+            positions[m] = float(i)
+        for i, m in enumerate(ga_sorted):
+            positions[m] = float(len(NGA)) + GAP + float(i)
+
+        for group in [nga_sorted, ga_sorted]:
+            for m in group:
+                mean, std = _mean_std(m, metric)
+                if np.isnan(mean):
+                    continue
+                hatch = "//" if m in NGA else None
+                ax.bar(positions[m], mean, width=0.62, color=_METHOD_COLORS[m],
+                       alpha=0.82, hatch=hatch, edgecolor="black", linewidth=0.7)
+                ax.errorbar(positions[m], mean, yerr=std, fmt="none",
+                            color="black", capsize=3, linewidth=1.4)
+
+        sep_x = len(NGA) - 0.5 + GAP / 2
+        ax.axvline(sep_x, color="gray", linestyle=":", linewidth=1.3, alpha=0.7)
+        ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.35)
+
+        all_pos = [positions[m] for m in nga_sorted + ga_sorted]
+        all_lab = [_METHOD_LABELS[m] for m in nga_sorted + ga_sorted]
+        ax.set_xticks(all_pos)
+        ax.set_xticklabels(all_lab, rotation=30, ha="right", fontsize=9.5)
+        ax.set_ylabel(ylabel, fontsize=10.5)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", alpha=0.25)
+
+        ymin, ymax = ax.get_ylim()
+        ax.text(np.mean([positions[m] for m in nga_sorted]), ymax * 0.995,
+                "Non-GA", ha="center", va="top", fontsize=8.5, color="gray", style="italic")
+        ax.text(np.mean([positions[m] for m in ga_sorted]),  ymax * 0.995,
+                "GA",     ha="center", va="top", fontsize=8.5, color="gray", style="italic")
+
+    legend_handles = [
+        Patch(facecolor="#cccccc", hatch="//", edgecolor="black", label="Non-GA baseline"),
+        Patch(facecolor="#cccccc", edgecolor="black", label="GA method"),
+    ]
+    axes[0].legend(handles=legend_handles, fontsize=9, loc="lower right")
+    fig.suptitle("GA vs Non-GA: Sorted by Score within Group  (error bars = ±1 SD)", fontsize=11)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ── White vs Black breakdown ───────────────────────────────────────────────────
+
+def plot_white_black_breakdown(runs: list[dict], out_path: str) -> None:
+    """Box + strip plots for white and black held-out scores separately."""
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+
+    def _scores(m, key):
+        return [r["heldout_metrics"][key]
+                for r in filtered[m]
+                if key in r.get("heldout_metrics", {})]
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.5), sharey=True)
+    rng_j = np.random.default_rng(2)
+
+    for ax_i, (color_key, score_key, panel) in enumerate([
+        ("White", "white_mean", "(a)"),
+        ("Black", "black_mean", "(b)"),
+    ]):
+        ax = axes[ax_i]
+        for i, m in enumerate(METHODS_MAIN):
+            vals = _scores(m, score_key)
+            if not vals:
+                continue
+            bp = ax.boxplot(
+                vals, positions=[i], widths=0.45, patch_artist=True,
+                medianprops={"color": "black", "linewidth": 2},
+                whiskerprops={"linewidth": 1.2}, capprops={"linewidth": 1.2},
+                showfliers=False,
+            )
+            bp["boxes"][0].set_facecolor(_METHOD_COLORS[m])
+            bp["boxes"][0].set_alpha(0.45)
+            jitter = rng_j.uniform(-0.15, 0.15, len(vals))
+            ax.scatter([i + j for j in jitter], vals, color=_METHOD_COLORS[m],
+                       s=28, alpha=0.85, zorder=4, edgecolors="white", linewidths=0.4)
+
+        ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.35)
+        ax.set_xticks(range(len(METHODS_MAIN)))
+        ax.set_xticklabels([_METHOD_LABELS[m] for m in METHODS_MAIN],
+                           rotation=30, ha="right", fontsize=9.5)
+        ax.set_ylabel(f"Score Playing as {color_key}", fontsize=10.5)
+        ax.set_title(f"{panel} Playing as {color_key}", fontsize=11)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", alpha=0.25)
+
+    fig.suptitle("White vs Black Repertoire Performance  (held-out, dashed = 0.5)", fontsize=12)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ── Generalization scatter ─────────────────────────────────────────────────────
+
+def plot_generalization(runs: list[dict], out_path: str) -> None:
+    """Scatter of training fitness vs held-out score, one point per seed."""
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+    markers = {
+        "most_played_baseline": "s",
+        "RANDOM_SEARCH":        "^",
+        "GREEDY_HILLCLIMB":     "D",
+        "STATIC":               "o",
+        "COEVOLVE_FROZEN":      "P",
+        "COEVOLVE":             "*",
+    }
+
+    fig, ax = plt.subplots(figsize=(7, 5.5))
+    all_train = []
+
+    for m in METHODS_MAIN:
+        xs, ys = [], []
+        for r in filtered[m]:
+            tf = r.get("final_training_fitness")
+            ho = r.get("heldout_metrics", {}).get("heldout_uniform_mean")
+            if tf is not None and ho is not None:
+                xs.append(float(tf))
+                ys.append(float(ho))
+                all_train.append(float(tf))
+        if xs:
+            ax.scatter(xs, ys, color=_METHOD_COLORS[m], marker=markers[m],
+                       s=60, alpha=0.82, label=_METHOD_LABELS[m],
+                       edgecolors="white", linewidths=0.5)
+
+    if all_train:
+        lo, hi = min(all_train), max(all_train)
+        pad = max((hi - lo) * 0.06, 0.01)
+        diag = np.linspace(lo - pad, hi + pad, 100)
+        ax.plot(diag, diag, "k--", linewidth=1, alpha=0.4, label="y = x  (no gap)")
+
+    ax.set_xlabel("Final Training Fitness", fontsize=11)
+    ax.set_ylabel("Held-out Mean Score", fontsize=11)
+    ax.set_title(
+        "Generalization: Training vs Held-out\n(points below y=x → training was optimistic)",
+        fontsize=11,
+    )
+    ax.legend(fontsize=9, framealpha=0.9, ncol=2)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ── Generalization gap ────────────────────────────────────────────────────────
+
+def plot_generalization_gap(runs: list[dict], out_path: str) -> None:
+    """Bar chart: (training fitness - held-out score) per method, sorted."""
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+
+    gaps_by_method: dict[str, list[float]] = {}
+    for m in METHODS_MAIN:
+        gaps = []
+        for r in filtered[m]:
+            tf = r.get("final_training_fitness")
+            ho = r.get("heldout_metrics", {}).get("heldout_uniform_mean")
+            if tf is not None and ho is not None:
+                gaps.append(float(tf) - float(ho))
+        if gaps:
+            gaps_by_method[m] = gaps
+
+    sorted_methods = sorted(gaps_by_method, key=lambda m: np.mean(gaps_by_method[m]), reverse=True)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    for i, m in enumerate(sorted_methods):
+        gaps   = gaps_by_method[m]
+        mean_g = float(np.mean(gaps))
+        std_g  = float(np.std(gaps, ddof=1)) if len(gaps) > 1 else 0.0
+        ax.bar(i, mean_g, width=0.6, color=_METHOD_COLORS[m], alpha=0.82,
+               edgecolor="black", linewidth=0.7)
+        ax.errorbar(i, mean_g, yerr=std_g, fmt="none", color="black", capsize=4, linewidth=1.5)
+
+    ax.axhline(0.0, color="black", linewidth=1.5)
+    ax.set_xticks(range(len(sorted_methods)))
+    ax.set_xticklabels([_METHOD_LABELS[m] for m in sorted_methods],
+                       rotation=25, ha="right", fontsize=10)
+    ax.set_ylabel("Training Fitness − Held-out Score", fontsize=10.5)
+    ax.set_title(
+        "Generalization Gap per Method  (positive = training was optimistic; error bars = ±1 SD)",
+        fontsize=11,
+    )
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(axis="y", alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ── Repertoire structure ───────────────────────────────────────────────────────
+
+def plot_repertoire_structure(runs: list[dict], out_path: str) -> None:
+    """Budget utilization and subgraph size per method."""
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+
+    stats: dict[str, dict[str, list]] = {
+        m: {"w_comm": [], "b_comm": [], "w_reach": [], "b_reach": []}
+        for m in METHODS_MAIN
+    }
+    for m in METHODS_MAIN:
+        for r in filtered[m]:
+            cand = r.get("final_best_candidate")
+            if cand is None:
+                continue
+            stats[m]["w_comm"].append(len(cand.get("white_committed", {})))
+            stats[m]["b_comm"].append(len(cand.get("black_committed", {})))
+            stats[m]["w_reach"].append(len(cand.get("white_reached", [])))
+            stats[m]["b_reach"].append(len(cand.get("black_reached", [])))
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
+    x     = np.arange(len(METHODS_MAIN))
+    width = 0.35
+    labels_m = [_METHOD_LABELS[m] for m in METHODS_MAIN]
+
+    for ax, (key_w, key_b, ylabel, title, show_budget) in [
+        (axes[0], "w_comm",  "b_comm",  "Committed Moves",     "(a) Budget Utilization",  True),
+        (axes[1], "w_reach", "b_reach", "Positions in Subgraph","(b) Subgraph Coverage",  False),
+    ]:
+        for offset, key, label, color, hatch in [
+            (-width / 2, key_w, "White", "#2196F3", None),
+            ( width / 2, key_b, "Black", "#F44336", "//"),
+        ]:
+            means = [float(np.mean(stats[m][key])) if stats[m][key] else 0.0 for m in METHODS_MAIN]
+            stds  = [float(np.std(stats[m][key], ddof=1)) if len(stats[m][key]) > 1 else 0.0
+                     for m in METHODS_MAIN]
+            ax.bar(x + offset, means, width=width, yerr=stds, label=label,
+                   color=color, alpha=0.75, capsize=3, hatch=hatch,
+                   edgecolor="black", linewidth=0.5, error_kw={"linewidth": 1.2})
+        if show_budget:
+            ax.axhline(BUDGET, color="black", linestyle="--", linewidth=1.2,
+                       alpha=0.6, label=f"Budget ({BUDGET})")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels_m, rotation=30, ha="right", fontsize=9.5)
+        ax.set_ylabel(ylabel, fontsize=10.5)
+        ax.set_title(title, fontsize=11)
+        ax.legend(fontsize=9, framealpha=0.9)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", alpha=0.25)
+
+    fig.suptitle("Repertoire Structure Across Seeds  (error bars = ±1 SD)", fontsize=12)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ── Lambda sensitivity visual ──────────────────────────────────────────────────
+
+def plot_lambda_sensitivity_visual(runs: list[dict], out_path: str) -> None:
+    """Line plot: held-out score vs lambda for STATIC and COEVOLVE."""
+    metrics_info = [
+        ("heldout_uniform_mean", "Mean Score"),
+        ("heldout_worst_band",   "Worst-Band Score"),
+    ]
+    lambdas = list(SENSITIVITY_LAMBDAS)
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=False)
+
+    for ax, (metric, ylabel) in zip(axes, metrics_info):
+        for m in ["STATIC", "COEVOLVE"]:
+            means, stds = [], []
+            for lam in lambdas:
+                subset = _select(runs, mode=m, seeds=SENSITIVITY_SEEDS, lambda_weight=lam)
+                vals   = list(_scores_by_seed_metric(subset, metric).values())
+                means.append(float(np.mean(vals)) if vals else float("nan"))
+                stds.append(float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0)
+            means_a = np.array(means)
+            stds_a  = np.array(stds)
+            color   = _METHOD_COLORS[m]
+            ax.plot(lambdas, means_a, "o-", label=_METHOD_LABELS[m],
+                    color=color, linewidth=2, markersize=7)
+            ax.fill_between(lambdas, means_a - stds_a, means_a + stds_a,
+                            alpha=0.15, color=color)
+
+        ax.set_xlabel("Lambda (λ)", fontsize=11)
+        ax.set_ylabel(ylabel, fontsize=10.5)
+        ax.set_title(ylabel, fontsize=11)
+        ax.set_xticks(lambdas)
+        ax.legend(fontsize=10, framealpha=0.9)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(alpha=0.25)
+
+    fig.suptitle(
+        "Lambda Sensitivity: Robustness Weight vs Held-out Performance  (shading = ±1 SD)",
+        fontsize=11,
+    )
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ── COEVOLVE dynamics ──────────────────────────────────────────────────────────
+
+def plot_coevolve_dynamics(runs: list[dict], out_path: str) -> None:
+    """3-panel COEVOLVE-only plot: best+mean fitness, repertoire diversity, opponent diversity."""
+    coevolve_runs = [
+        r for r in _select(runs, mode="COEVOLVE", seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        if r.get("history")
+    ]
+    if not coevolve_runs:
+        print("  [skip] no COEVOLVE history found.")
+        return
+
+    n_gens = len(coevolve_runs[0]["history"])
+    valid  = [r for r in coevolve_runs if len(r["history"]) == n_gens]
+    gens   = np.arange(n_gens)
+
+    def _mat(key):
+        rows = []
+        for r in valid:
+            row = [h.get(key) for h in r["history"]]
+            if all(v is not None for v in row):
+                rows.append(row)
+        return np.array(rows) if rows else np.empty((0, n_gens))
+
+    def _plot_band(ax, mat, color, label=None, linestyle="-"):
+        if mat.size == 0:
+            return
+        m_line = np.mean(mat, axis=0)
+        n = mat.shape[0]
+        ci = 1.96 * np.std(mat, axis=0, ddof=1) / np.sqrt(n) if n > 1 else np.zeros(n_gens)
+        ax.plot(gens, m_line, linestyle, color=color, linewidth=2,
+                label=label if label else "")
+        ax.fill_between(gens, m_line - ci, m_line + ci, alpha=0.15, color=color)
+
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+
+    # (a) best vs mean training fitness
+    ax = axes[0]
+    _plot_band(ax, _mat("best_training_fitness"), "#0072B2", label="Best", linestyle="-")
+    _plot_band(ax, _mat("mean_training_fitness"), "#56B4E9", label="Mean", linestyle="--")
+    ax.set_xlabel("Generation", fontsize=11)
+    ax.set_ylabel("Training Fitness", fontsize=11)
+    ax.set_title("(a) Best vs Mean Fitness", fontsize=11)
+    ax.legend(fontsize=10)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(axis="y", alpha=0.25)
+
+    # (b) repertoire diversity
+    ax = axes[1]
+    _plot_band(ax, _mat("repertoire_diversity"), "#009E73")
+    ax.set_xlabel("Generation", fontsize=11)
+    ax.set_ylabel("Mean Pairwise Jaccard Distance", fontsize=11)
+    ax.set_title("(b) Repertoire Population Diversity", fontsize=11)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(axis="y", alpha=0.25)
+
+    # (c) opponent diversity — only non-None rows
+    ax = axes[2]
+    opp_rows = []
+    for r in valid:
+        row = [h.get("opponent_diversity") for h in r["history"]]
+        row_clean = [v if v is not None else float("nan") for v in row]
+        opp_rows.append(row_clean)
+    if opp_rows:
+        opp_mat = np.array(opp_rows)
+        _plot_band(ax, opp_mat, "#E69F00")
+    ax.set_xlabel("Generation", fontsize=11)
+    ax.set_ylabel("Mean L2 Distance", fontsize=11)
+    ax.set_title("(c) Opponent Population Diversity", fontsize=11)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(axis="y", alpha=0.25)
+
+    fig.suptitle("COEVOLVE Dynamics Across Seeds  (95% CI)", fontsize=12)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ── Seed consistency heatmap ───────────────────────────────────────────────────
+
+def plot_seed_heatmap(runs: list[dict], out_path: str) -> None:
+    """Heatmap: rows=seeds, columns=methods, colour=held-out score."""
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+    seeds_sorted = sorted(MAIN_SEEDS)
+    metrics_info = [
+        ("heldout_uniform_mean", "Mean Score"),
+        ("heldout_worst_band",   "Worst-Band Score"),
+    ]
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+
+    for ax, (metric, title) in zip(axes, metrics_info):
+        matrix = np.full((len(seeds_sorted), len(METHODS_MAIN)), np.nan)
+        for mi, m in enumerate(METHODS_MAIN):
+            scores = _scores_by_seed_metric(filtered[m], metric)
+            for si, seed in enumerate(seeds_sorted):
+                if seed in scores:
+                    matrix[si, mi] = scores[seed]
+
+        masked = np.ma.masked_invalid(matrix)
+        vmin = float(np.nanmin(matrix)) if not np.all(np.isnan(matrix)) else 0.0
+        vmax = float(np.nanmax(matrix)) if not np.all(np.isnan(matrix)) else 1.0
+
+        im = ax.imshow(masked, aspect="auto", cmap="RdYlGn", vmin=vmin, vmax=vmax)
+        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+        ax.set_xticks(range(len(METHODS_MAIN)))
+        ax.set_xticklabels([_METHOD_LABELS[m] for m in METHODS_MAIN],
+                           rotation=35, ha="right", fontsize=9)
+        ax.set_yticks(range(len(seeds_sorted)))
+        ax.set_yticklabels([str(s) for s in seeds_sorted], fontsize=8)
+        ax.set_ylabel("Seed", fontsize=10)
+        ax.set_title(title, fontsize=11)
+
+        mid = (vmax - vmin) / 2 + vmin if vmax > vmin else 0.5
+        for si in range(len(seeds_sorted)):
+            for mi in range(len(METHODS_MAIN)):
+                val = matrix[si, mi]
+                if not np.isnan(val):
+                    txt_color = "black" if abs(val - mid) < (vmax - vmin) * 0.25 else "white"
+                    ax.text(mi, si, f"{val:.3f}", ha="center", va="center",
+                            fontsize=6.5, color=txt_color)
+
+    fig.suptitle("Per-Seed Held-out Scores  (green = high, red = low)", fontsize=12)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -833,6 +1488,50 @@ def run_analysis(runs_dir: str = "runs", results_dir: str = "results") -> None:
 
     print("\nPlotting convergence.png ...")
     plot_convergence(runs, os.path.join(results_dir, "convergence.png"))
+    print("  saved.")
+
+    print("\nPlotting score_distributions.png ...")
+    plot_score_distributions(runs, os.path.join(results_dir, "score_distributions.png"))
+    print("  saved.")
+
+    print("\nPlotting band_breakdown.png ...")
+    plot_band_breakdown(runs, os.path.join(results_dir, "band_breakdown.png"))
+    print("  saved.")
+
+    print("\nPlotting effect_sizes.png ...")
+    plot_effect_sizes(runs, os.path.join(results_dir, "effect_sizes.png"))
+    print("  saved.")
+
+    print("\nPlotting ga_vs_nonga.png ...")
+    plot_ga_vs_nonga(runs, os.path.join(results_dir, "ga_vs_nonga.png"))
+    print("  saved.")
+
+    print("\nPlotting white_black_breakdown.png ...")
+    plot_white_black_breakdown(runs, os.path.join(results_dir, "white_black_breakdown.png"))
+    print("  saved.")
+
+    print("\nPlotting generalization.png ...")
+    plot_generalization(runs, os.path.join(results_dir, "generalization.png"))
+    print("  saved.")
+
+    print("\nPlotting generalization_gap.png ...")
+    plot_generalization_gap(runs, os.path.join(results_dir, "generalization_gap.png"))
+    print("  saved.")
+
+    print("\nPlotting repertoire_structure.png ...")
+    plot_repertoire_structure(runs, os.path.join(results_dir, "repertoire_structure.png"))
+    print("  saved.")
+
+    print("\nPlotting lambda_sensitivity.png ...")
+    plot_lambda_sensitivity_visual(runs, os.path.join(results_dir, "lambda_sensitivity.png"))
+    print("  saved.")
+
+    print("\nPlotting coevolve_dynamics.png ...")
+    plot_coevolve_dynamics(runs, os.path.join(results_dir, "coevolve_dynamics.png"))
+    print("  saved.")
+
+    print("\nPlotting seed_heatmap.png ...")
+    plot_seed_heatmap(runs, os.path.join(results_dir, "seed_heatmap.png"))
     print("  saved.")
 
     print("\nComputing sensitivity_table.csv ...")
