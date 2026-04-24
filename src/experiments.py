@@ -1,17 +1,23 @@
 """
-Experiment runner: define the run matrix and execute all runs, saving one
-pickle per run.
+Experiment runner — defines every run in the experiment matrix and dispatches them.
 
-Three batches:
-  MAIN_EXPERIMENTS        — 4 methods × 15 seeds = 60 runs (lambda = 1.0)
-  BASELINE_EXPERIMENTS    — 2 non-GA baselines × 15 seeds = 30 runs
-  SENSITIVITY_EXPERIMENTS — 2 methods × 3 lambdas × 5 seeds = 30 runs
+Six experiment batches:
 
-Non-GA baselines establish that GA crossover/mutation adds value beyond
-greedy initialisation:
-  RANDOM_SEARCH    — evaluate 1500 random candidates, return the best
-  GREEDY_HILLCLIMB — start from greedy init, accept mutations that improve
-                     fitness (hill-climbing without a population), 1500 steps
+  MAIN_EXPERIMENTS           — 4 methods × 15 seeds = 60 runs  (lambda = 1.0)
+  BASELINE_EXPERIMENTS       — 2 non-GA baselines × 15 seeds = 30 runs
+  SENSITIVITY_EXPERIMENTS    — 2 methods × 3 lambdas × 5 seeds = 30 runs
+  CLOSURE_ABLATION_EXPERIMENTS — 2 no-closure variants × 15 seeds = 30 runs
+  THRESHOLD_SWEEP_EXPERIMENTS  — 5 thresholds × 5 seeds = 25 runs (STATIC only)
+  BUDGET_SWEEP_EXPERIMENTS     — 3 budgets × 5 seeds = 15 runs   (STATIC only, optional)
+
+Non-GA baselines test whether GA population + crossover adds value over
+single-solution search with the same fitness-call budget:
+  RANDOM_SEARCH    — sample 1500 random candidates, return the best
+  GREEDY_HILLCLIMB — (1+1)-ES: start from greedy init, 1500 accept-if-better steps
+
+Closure ablation tests the novel chromosome contribution: does forcing opponent
+reply coverage (the closure rule) actually improve held-out performance, or
+would a simpler unconstrained representation work equally well?
 """
 
 from __future__ import annotations
@@ -37,6 +43,12 @@ from src.config import (
     SENSITIVITY_METHODS,
     SENSITIVITY_LAMBDAS,
     SENSITIVITY_SEEDS,
+    CLOSURE_ABLATION_METHODS,
+    CLOSURE_ABLATION_SEEDS,
+    CLOSURE_THRESHOLD_VALUES,
+    CLOSURE_THRESHOLD_SEEDS,
+    BUDGET_VALUES,
+    BUDGET_SEEDS,
     LAMBDA_WEIGHT,
     NOVELTY_WEIGHT,
     HOF_SIZE,
@@ -74,14 +86,46 @@ SENSITIVITY_EXPERIMENTS = [
     for seed in SENSITIVITY_SEEDS
 ]
 
-ALL_EXPERIMENTS = MAIN_EXPERIMENTS + BASELINE_EXPERIMENTS + SENSITIVITY_EXPERIMENTS  # 120 runs total
+# Closure ablation: same as main STATIC/COEVOLVE but with use_closure=False.
+# Mode string is "STATIC_NOCLOSURE" or "COEVOLVE_NOCLOSURE"; dispatcher strips
+# the suffix and passes use_closure=False in the config dict.
+CLOSURE_ABLATION_EXPERIMENTS = [
+    {'method': method, 'seed': seed, 'lambda_weight': MAIN_LAMBDA, 'alpha': 1 / 3}
+    for method in CLOSURE_ABLATION_METHODS
+    for seed in CLOSURE_ABLATION_SEEDS
+]
+
+# Closure threshold sweep: STATIC at five different thresholds.
+# Uses a separate 'closure_threshold' key so the dispatcher can override it.
+THRESHOLD_SWEEP_EXPERIMENTS = [
+    {'method': 'STATIC', 'seed': seed, 'lambda_weight': MAIN_LAMBDA,
+     'alpha': 1 / 3, 'closure_threshold': thresh}
+    for thresh in CLOSURE_THRESHOLD_VALUES
+    for seed in CLOSURE_THRESHOLD_SEEDS
+]
+
+# Budget sweep: STATIC at three different committed-move budgets (optional).
+BUDGET_SWEEP_EXPERIMENTS = [
+    {'method': 'STATIC', 'seed': seed, 'lambda_weight': MAIN_LAMBDA,
+     'alpha': 1 / 3, 'budget': bgt}
+    for bgt in BUDGET_VALUES
+    for seed in BUDGET_SEEDS
+]
+
+# 120 original runs.  New ablation runs are in separate lists so they can be
+# run independently without re-running everything.
+ALL_EXPERIMENTS = MAIN_EXPERIMENTS + BASELINE_EXPERIMENTS + SENSITIVITY_EXPERIMENTS
+ALL_ABLATION_EXPERIMENTS = CLOSURE_ABLATION_EXPERIMENTS + THRESHOLD_SWEEP_EXPERIMENTS + BUDGET_SWEEP_EXPERIMENTS
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def run_filename(method: str, lambda_weight: float, seed: int, runs_dir: str = 'runs') -> str:
-    return os.path.join(runs_dir, f"{method}_l{lambda_weight}_s{seed}.pkl")
+def run_filename(method: str, lambda_weight: float, seed: int, runs_dir: str = 'runs',
+                 suffix: str = '') -> str:
+    """Build the output path for one run. suffix allows ablation variants to
+    use distinct filenames (e.g. '_thresh0.05' or '_budget15')."""
+    return os.path.join(runs_dir, f"{method}_l{lambda_weight}_s{seed}{suffix}.pkl")
 
 
 def check_clean_git() -> None:
@@ -336,14 +380,22 @@ def run_all(
         method = run['method']
         seed = run['seed']
         lam = run['lambda_weight']
-        out_path = run_filename(method, lam, seed, runs_dir)
+
+        # Build a filename suffix for ablation variants so they don't collide with main runs.
+        suffix = ''
+        if 'closure_threshold' in run:
+            suffix = f"_thresh{run['closure_threshold']}"
+        if 'budget' in run:
+            suffix = f"_budget{run['budget']}"
+
+        out_path = run_filename(method, lam, seed, runs_dir, suffix=suffix)
 
         if os.path.exists(out_path):
             completed += 1
             print(f"[{completed}/{total}] SKIP  {out_path}")
             continue
 
-        print(f"[{completed + 1}/{total}] RUN   method={method}  lam={lam}  seed={seed} ...")
+        print(f"[{completed + 1}/{total}] RUN   method={method}  lam={lam}  seed={seed}{suffix} ...")
 
         if method == 'most_played_baseline':
             result = run_baseline(
@@ -373,14 +425,29 @@ def run_all(
                 eval_cache_heldout,
             )
         else:
+            # All GA modes go through run_coevolution.
+            # STATIC_NOCLOSURE / COEVOLVE_NOCLOSURE: strip the suffix, disable closure.
+            ga_mode = method
+            use_closure = True
+            if method.endswith('_NOCLOSURE'):
+                ga_mode = method[: -len('_NOCLOSURE')]
+                use_closure = False
+
             config = {
                 'lambda_weight': lam,
                 'alpha': run['alpha'],
                 'novelty_weight': run.get('novelty_weight', NOVELTY_WEIGHT),
                 'hof_size': run.get('hof_size', HOF_SIZE),
+                'use_closure': use_closure,
             }
+            # Allow individual runs to override closure threshold and budget.
+            if 'closure_threshold' in run:
+                config['closure_threshold'] = run['closure_threshold']
+            if 'budget' in run:
+                config['budget'] = run['budget']
+
             result = run_coevolution(
-                mode=method,
+                mode=ga_mode,
                 config=config,
                 seed=seed,
                 graph_train=graph_train,
@@ -389,6 +456,9 @@ def run_all(
                 eval_cache_train=eval_cache_train,
                 eval_cache_heldout=eval_cache_heldout,
             )
+            # Store the original method name (including _NOCLOSURE) so analysis
+            # can group these runs separately from the standard runs.
+            result['mode'] = method
 
         with open(out_path, 'wb') as fh:
             pickle.dump(result, fh)
@@ -399,5 +469,28 @@ def run_all(
     print(f"\nFinished: {completed}/{total} runs.")
 
 
+def run_ablations(
+    data_dir: str = 'data',
+    runs_dir: str = 'runs',
+    skip_git_check: bool = False,
+) -> None:
+    """Run only the new ablation experiments (closure ablation + sweeps).
+
+    Skips existing files so it's safe to call multiple times. Separates them
+    from the main experiments to avoid re-running those 120 runs.
+    """
+    run_all(
+        data_dir=data_dir,
+        runs_dir=runs_dir,
+        experiments=ALL_ABLATION_EXPERIMENTS,
+        skip_git_check=skip_git_check,
+    )
+
+
 if __name__ == '__main__':
-    run_all()
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == 'ablations':
+        # python -m src.experiments ablations
+        run_ablations(skip_git_check=True)
+    else:
+        run_all()

@@ -97,7 +97,7 @@ SHRINKAGE_TAU = 20
 # Which ply depths to use when computing the prior mean.
 # Only positions at ply_depth <= this value are used. Shallow positions have
 # the most games so they give the most reliable prior estimate.
-PRIOR_MAX_PLY = 4
+PRIOR_MAX_PLY = 8
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. REPERTOIRE CHROMOSOME  (src/repertoire.py)
@@ -108,13 +108,13 @@ PRIOR_MAX_PLY = 4
 # positions.
 # Increase = bigger/more complete repertoire, harder search problem.
 # Decrease = simpler repertoire, easier to optimize.
-BUDGET = 20
+BUDGET = 30
 
 # Closure threshold: an opponent reply must be covered in the repertoire if
 # it appears in >= this fraction of games at a given position.
 # 0.05 = cover any move played in >=5% of games. Raise to reduce the size of
 # forced coverage (fewer required moves); lower to be more comprehensive.
-CLOSURE_THRESHOLD = 0.05
+CLOSURE_THRESHOLD = 0.15
 
 # How many times to retry a mutation before giving up and returning a clone.
 # More retries = more likely to succeed but slower per generation.
@@ -122,7 +122,13 @@ MUTATION_RETRIES = 5
 
 # Maximum ply depth at which a committed node is eligible for opening replacement.
 # Nodes at ply_depth <= this value can have their subtree replaced wholesale.
-OPENING_REPLACEMENT_MAX_PLY = 2
+OPENING_REPLACEMENT_MAX_PLY = 4
+
+# Whether to apply the closure rule during construction and mutation.
+# True  = standard mode: auto-cover all opponent replies >= CLOSURE_THRESHOLD.
+# False = no-closure ablation: only the direct child of each committed move is added.
+# Individual experiments can override this via their config dict.
+USE_CLOSURE = True
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. GENETIC ALGORITHM  (src/coevolution.py)
@@ -130,25 +136,25 @@ OPENING_REPLACEMENT_MAX_PLY = 2
 
 # Number of repertoire candidates in the population.
 # More = better coverage of search space, slower per generation.
-POP_SIZE_REPERTOIRES = 30
+POP_SIZE_REPERTOIRES = 100
 
 # Number of opponent individuals in the population (COEVOLVE mode only).
-POP_SIZE_OPPONENTS = 20
+POP_SIZE_OPPONENTS = 50
 
 # Number of generations to run the GA.
 # More = more evolution time. Total evaluations = POP_SIZE_REPERTOIRES × N_GENERATIONS.
-N_GENERATIONS = 50
+N_GENERATIONS = 60
 
 # Tournament selection size. A random subset of this many individuals is drawn,
 # and the fittest wins. Larger = stronger selection pressure (good individuals
 # dominate faster but diversity drops). Smaller = weaker selection (slower
 # but more diversity preserved). Must be <= population size.
-TOURNAMENT_SIZE = 3
+TOURNAMENT_SIZE = 2
 
 # Probability that two selected parents undergo crossover to produce a child.
 # If crossover does not trigger, the child is a clone of parent A.
 # 0.0 = no crossover (pure mutation), 1.0 = always crossover.
-CROSSOVER_RATE = 0.7
+CROSSOVER_RATE = 0.8
 
 # Probability that a mutation is applied to a child after crossover/cloning.
 # 0.0 = no mutation, 1.0 = always mutate.
@@ -167,7 +173,7 @@ HOF_SIZE = 5
 # Mutation strength for opponent chromosomes (fraction of Dirichlet noise).
 # new_mixture = (1 - strength) * old + strength * noise
 # 0.0 = no change, 1.0 = completely random. Controls how fast opponents drift.
-OPPONENT_MUTATION_STRENGTH = 0.3
+OPPONENT_MUTATION_STRENGTH = 0.5
 
 # Weight for the novelty (diversity) term in opponent fitness.
 # opponent_fitness = exploitation + NOVELTY_WEIGHT * diversity
@@ -175,11 +181,11 @@ OPPONENT_MUTATION_STRENGTH = 0.3
 # Diversity = mean L2 distance from this opponent to all others.
 # Higher novelty weight = opponents stay spread out (avoid all converging to
 # the same worst-case band). Set to 0.0 to disable diversity bonus.
-NOVELTY_WEIGHT = 0.1
+NOVELTY_WEIGHT = 0.4
 
 # Probability that two selected opponent parents undergo crossover.
 # 0.0 = always clone parent A, 1.0 = always crossover.
-OPPONENT_CROSSOVER_RATE = 0.5
+OPPONENT_CROSSOVER_RATE = 0.8
 
 # Probability that an opponent child is mutated after crossover/cloning.
 # 0.0 = no mutation, 1.0 = always mutate.
@@ -229,20 +235,22 @@ SENSITIVITY_METHODS = ["STATIC", "COEVOLVE"]
 SENSITIVITY_LAMBDAS = [0.0, 1.0, 2.0]
 SENSITIVITY_SEEDS   = list(range(2000, 2005))   # 5 seeds (smaller — just sensitivity)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 8. ANALYSIS  (src/analyze.py)
-# ─────────────────────────────────────────────────────────────────────────────
+# --- Closure-constraint ablation ---
+# The key novel contribution: does the closure rule actually help?
+# Runs STATIC and COEVOLVE both WITH and WITHOUT the closure constraint,
+# using the same seeds so results are paired (same random initialisation).
+# 2 methods × 15 seeds = 30 new runs.
+CLOSURE_ABLATION_METHODS = ["STATIC_NOCLOSURE", "COEVOLVE_NOCLOSURE"]
+CLOSURE_ABLATION_SEEDS   = list(range(1000, 1015))   # same 15 seeds as main
 
-# RNG seed for the adversarial Dirichlet mixture sampling.
-ADVERSARIAL_RNG_SEED = 7
+# --- Closure threshold sensitivity ---
+# Is CLOSURE_THRESHOLD = 0.15 the right value, or does performance change a lot?
+# STATIC only (cheaper) × 5 thresholds × 5 seeds = 25 new runs.
+CLOSURE_THRESHOLD_VALUES = [0.05, 0.10, 0.15, 0.20, 0.30]
+CLOSURE_THRESHOLD_SEEDS  = list(range(2000, 2005))   # 5 seeds
 
-# Number of random opponent mixtures to sample for the adversarial metric.
-ADVERSARIAL_N_SAMPLES = 200
-
-# Dirichlet concentration parameter for sampling opponent mixtures.
-# 1.0 = uniform Dirichlet (all mixtures equally likely).
-ADVERSARIAL_DIRICHLET_ALPHA = 1.0
-
-# Quantile of sampled mixture scores used as the adversarial metric.
-# 0.10 = 10th percentile (worst 10% of random opponents).
-ADVERSARIAL_QUANTILE = 0.10
+# --- Budget sensitivity (optional) ---
+# Does performance plateau before the 25-move budget, or continue growing?
+# STATIC only × 3 budgets × 5 seeds = 15 new runs.
+BUDGET_VALUES = [15, 25, 35]
+BUDGET_SEEDS  = list(range(2000, 2005))   # 5 seeds

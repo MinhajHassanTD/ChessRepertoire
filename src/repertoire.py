@@ -1,6 +1,15 @@
 """
-C5 — Repertoire and Candidate
-Chromosome representation and all genetic operators.
+Chromosome representation and all genetic operators for chess opening repertoires.
+
+A Repertoire is one half of a Candidate (the white or black side). It stores:
+  - committed: a dict of {fen -> move_uci} for positions where we've decided our move
+  - reached:   the full set of positions reachable under those decisions + closure
+  - use_closure: whether to auto-cover common opponent replies (the novel constraint)
+
+A Candidate bundles a white + black Repertoire with cached fitness values.
+
+Genetic operators: construct_initial, construct_random, mutate_*, crossover.
+All operators raise MutationFailed when the result would violate budget or closure.
 """
 
 from __future__ import annotations
@@ -17,7 +26,7 @@ from src.config import BUDGET, CLOSURE_THRESHOLD, MUTATION_RETRIES, STARTING_FEN
 # ── Exceptions ────────────────────────────────────────────────────────────────
 
 class MutationFailed(Exception):
-    """Raised when a mutation or crossover violates constraints."""
+    """Raised when a mutation or crossover violates the budget or closure constraint."""
 
 
 # ── Data classes ──────────────────────────────────────────────────────────────
@@ -26,8 +35,9 @@ class MutationFailed(Exception):
 class Repertoire:
     color: str                        # 'white' or 'black'
     committed: dict                   # fen -> move_uci at our decision nodes
-    reached: set                      # all positions in the subgraph
-    graph: dict                       # reference to the position graph
+    reached: set                      # all positions in the subgraph (committed + opponent coverage)
+    graph: dict                       # reference to the position graph (not copied — shared)
+    use_closure: bool = field(default=True)   # if False, opponent replies are NOT auto-added (ablation)
 
     def copy(self) -> "Repertoire":
         return Repertoire(
@@ -35,6 +45,7 @@ class Repertoire:
             committed=dict(self.committed),
             reached=set(self.reached),
             graph=self.graph,
+            use_closure=self.use_closure,
         )
 
 
@@ -69,11 +80,15 @@ def _our_turn(rep: Repertoire, fen: str) -> bool:
 
 def _expand_to_closure(rep: Repertoire, frontier: list[str]) -> None:
     """
-    BFS-expand from *frontier* positions: at opponent-turn nodes, add every
-    child whose aggregate frequency >= CLOSURE_THRESHOLD; at our-turn nodes
-    just add them to reached (the caller is responsible for committing).
-    All newly reachable positions are added to rep.reached.
+    BFS from *frontier*: at opponent-turn nodes, force-add every child move
+    played in >= CLOSURE_THRESHOLD of games. At our-turn nodes, stop — the
+    caller decides whether to commit a move there.
+
+    Skipped entirely when rep.use_closure is False (ablation mode).
     """
+    if not rep.use_closure:
+        return  # no-closure ablation: opponent replies are not forced into reached
+
     queue = deque(frontier)
     while queue:
         fen = queue.popleft()
@@ -180,13 +195,16 @@ def _remove_subtree(rep: Repertoire, below_fen: str) -> None:
 
 # ── Public functions ──────────────────────────────────────────────────────────
 
-def construct_initial(graph: dict, color: str, budget: int, rng) -> "Repertoire":
+def construct_initial(graph: dict, color: str, budget: int, rng, use_closure: bool = True) -> "Repertoire":
     """
-    Greedy construction: at each our-turn node, pick the move with highest
-    aggregate frequency.  Expand all opponent replies with aggregate frequency
-    >= CLOSURE_THRESHOLD.  Stop expanding when budget is reached.
+    Greedy construction: at each our-turn node, pick the most-played move.
+    With use_closure=True (default), all opponent replies at >= CLOSURE_THRESHOLD
+    frequency are force-added to reached. With use_closure=False (ablation),
+    only the direct child of each committed move is added.
+    Stops when the committed-move budget is reached.
     """
-    rep = Repertoire(color=color, committed={}, reached={STARTING_FEN}, graph=graph)
+    rep = Repertoire(color=color, committed={}, reached={STARTING_FEN}, graph=graph,
+                     use_closure=use_closure)
     _expand_to_closure(rep, [STARTING_FEN])
 
     queue: deque[str] = deque()
@@ -223,12 +241,14 @@ def construct_initial(graph: dict, color: str, budget: int, rng) -> "Repertoire"
     return rep
 
 
-def construct_random(graph: dict, color: str, budget: int, rng) -> "Repertoire":
+def construct_random(graph: dict, color: str, budget: int, rng, use_closure: bool = True) -> "Repertoire":
     """
-    Like construct_initial, but at each our-turn node, pick a move via
-    weighted random choice using aggregate frequencies as weights.
+    Like construct_initial, but picks moves via weighted random choice using
+    aggregate frequencies as weights. use_closure controls whether opponent
+    replies are auto-added (True = standard; False = ablation mode).
     """
-    rep = Repertoire(color=color, committed={}, reached={STARTING_FEN}, graph=graph)
+    rep = Repertoire(color=color, committed={}, reached={STARTING_FEN}, graph=graph,
+                     use_closure=use_closure)
     _expand_to_closure(rep, [STARTING_FEN])
 
     queue: deque[str] = deque()
@@ -268,14 +288,12 @@ def construct_random(graph: dict, color: str, budget: int, rng) -> "Repertoire":
 
 def validate(rep: Repertoire) -> bool:
     """
-    Check that the repertoire satisfies:
-    1. Closure rule: every opponent-turn position in reached has every child
-       with aggregate frequency >= CLOSURE_THRESHOLD also in reached.
-    2. Within budget.
-    3. Consistency: for every committed node, the child of the committed move
-       is in reached.
+    Check that the repertoire satisfies all constraints:
+    1. Within budget (len(committed) <= BUDGET).
+    2. Consistency: every committed node's chosen move leads to a child in reached.
+    3. Closure (only when rep.use_closure=True): every opponent-turn node in
+       reached has all moves with frequency >= CLOSURE_THRESHOLD also in reached.
     """
-    # Budget
     if len(rep.committed) > BUDGET:
         return False
 
@@ -285,7 +303,7 @@ def validate(rep: Repertoire) -> bool:
         node = rep.graph["nodes"][fen]
 
         if _our_turn(rep, fen):
-            # Consistency: if committed, child must be in reached
+            # Consistency: if we committed a move here, its child must be reachable
             if fen in rep.committed:
                 move = rep.committed[fen]
                 if move not in node["children"]:
@@ -293,8 +311,8 @@ def validate(rep: Repertoire) -> bool:
                 child_fen = node["children"][move]["child_fen"]
                 if child_fen not in rep.reached:
                     return False
-        else:
-            # Closure: all frequent opponent moves must be covered
+        elif rep.use_closure:
+            # Closure rule: all common opponent moves must be covered
             freq = aggregate_move_freq(rep.graph, fen)
             for move_uci, f in freq.items():
                 if f >= CLOSURE_THRESHOLD:

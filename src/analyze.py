@@ -1,13 +1,32 @@
 """
-Analysis: load all run pickles, compute statistics, produce tables and plots.
+Analysis: load all run pickles, compute statistics, and produce tables + plots.
 
-Outputs (under results/):
-    main_table.csv            — one row per (metric, method); mean/std/median/
-                                Holm-corrected Wilcoxon p vs STATIC, A12 vs STATIC
-    convergence.png           — best-training-fitness curves with 95% CI
-    sensitivity_table.csv     — (metric, method, lambda) rows; mean/std
-    diagnostic_table.csv      — COEVOLVE per-generation averages across seeds
-    repertoire_subgraphs.txt  — best candidate per GA mode written as chess lines
+Core outputs (results/):
+    main_table.csv              — one row per (metric, method): mean/std, Wilcoxon p,
+                                  A12 effect size (all vs STATIC as reference)
+    convergence.png             — GA training curves with 95% CI across seeds
+    score_distributions.png     — box + strip for both held-out metrics, all 4 methods
+    band_breakdown.png          — per-rating-band score grouped by method
+    closure_ablation.png        — closure ON vs OFF for STATIC and COEVOLVE (new)
+    closure_threshold.png       — held-out score vs threshold value (new)
+    budget_sensitivity.png      — held-out score vs budget size (new)
+    opening_diversity.csv       — first-move distribution per method (new)
+    compute_cost.csv            — wall time per method (new)
+
+Appendix outputs (only when include_appendix=True):
+    effect_sizes.png            — horizontal A12 bars vs Static GA
+    ga_vs_nonga.png             — Non-GA / GA groups separated and sorted
+    white_black_breakdown.png   — white vs black performance per method
+    generalization.png          — scatter: training fitness vs held-out score
+    generalization_gap.png      — bar: training − held-out per method
+    repertoire_structure.png    — committed moves + subgraph size per method
+    lambda_sensitivity.png      — held-out score vs lambda value
+    coevolve_dynamics.png       — COEVOLVE internal dynamics (3-panel)
+    seed_heatmap.png            — per-seed scores as a heatmap
+    sensitivity_table.csv       — lambda sensitivity results
+    diagnostic_table.csv        — COEVOLVE per-generation averages
+    repertoire_tree.txt         — best candidate per GA mode as a decision tree
+    repertoire_grouped.txt      — best candidate grouped by opening family
 """
 
 from __future__ import annotations
@@ -28,6 +47,11 @@ from src.fitness import BANDS, walk
 from src.config import (
     MAIN_SEEDS,
     SENSITIVITY_SEEDS,
+    CLOSURE_ABLATION_SEEDS,
+    CLOSURE_THRESHOLD_VALUES,
+    CLOSURE_THRESHOLD_SEEDS,
+    BUDGET_VALUES,
+    BUDGET_SEEDS,
     MAIN_LAMBDA,
     SENSITIVITY_LAMBDAS,
     BUDGET,
@@ -36,21 +60,16 @@ from src.config import (
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
+# Core 4 methods for the main paper comparison. RANDOM_SEARCH and COEVOLVE_FROZEN
+# are excluded from main-text figures — they're in the 120 runs but tell a muddier story.
 METHODS_MAIN = [
-    "most_played_baseline",
-    "RANDOM_SEARCH",
-    "GREEDY_HILLCLIMB",
-    "STATIC",
-    "COEVOLVE_FROZEN",
-    "COEVOLVE",
+    "most_played_baseline",  # human heuristic baseline
+    "GREEDY_HILLCLIMB",      # non-GA search baseline (same eval budget as GA)
+    "STATIC",                # GA with fixed uniform opponent
+    "COEVOLVE",              # GA with co-evolving opponent population
 ]
-NON_STATIC_METHODS = [
-    "most_played_baseline",
-    "RANDOM_SEARCH",
-    "GREEDY_HILLCLIMB",
-    "COEVOLVE_FROZEN",
-    "COEVOLVE",
-]
+NON_STATIC_METHODS = [m for m in METHODS_MAIN if m != "STATIC"]
+
 SENS_SEEDS = SENSITIVITY_SEEDS
 
 HELDOUT_METRICS = [
@@ -60,23 +79,28 @@ HELDOUT_METRICS = [
 
 # ── Display constants ─────────────────────────────────────────────────────────
 
-# Wong colorblind-friendly palette
+# Wong colorblind-safe palette — works in greyscale and for common colour-blindness types.
 _METHOD_COLORS = {
-    "most_played_baseline": "#999999",
-    "RANDOM_SEARCH":        "#E69F00",
-    "GREEDY_HILLCLIMB":     "#56B4E9",
-    "STATIC":               "#009E73",
-    "COEVOLVE_FROZEN":      "#F0E442",
-    "COEVOLVE":             "#0072B2",
+    "most_played_baseline":   "#999999",  # grey
+    "RANDOM_SEARCH":          "#E69F00",  # orange (appendix only)
+    "GREEDY_HILLCLIMB":       "#56B4E9",  # sky blue
+    "STATIC":                 "#009E73",  # green
+    "COEVOLVE_FROZEN":        "#F0E442",  # yellow (appendix only)
+    "COEVOLVE":               "#0072B2",  # blue
+    # No-closure ablation variants get lighter versions of their parent's colour.
+    "STATIC_NOCLOSURE":       "#66C2A5",  # light green
+    "COEVOLVE_NOCLOSURE":     "#80B1D3",  # light blue
 }
 
 _METHOD_LABELS = {
-    "most_played_baseline": "Most Played",
-    "RANDOM_SEARCH":        "Rand. Search",
-    "GREEDY_HILLCLIMB":     "Hill-climb",
-    "STATIC":               "Static GA",
-    "COEVOLVE_FROZEN":      "Frozen CoEvo",
-    "COEVOLVE":             "CoEvolve",
+    "most_played_baseline":   "Most Played",
+    "RANDOM_SEARCH":          "Rand. Search",
+    "GREEDY_HILLCLIMB":       "Hill-climb",
+    "STATIC":                 "Static GA",
+    "COEVOLVE_FROZEN":        "Frozen CoEvo",
+    "COEVOLVE":               "CoEvolve",
+    "STATIC_NOCLOSURE":       "Static (no closure)",
+    "COEVOLVE_NOCLOSURE":     "CoEvolve (no closure)",
 }
 
 _BAND_COLORS = ["#d62728", "#ff7f0e", "#1f77b4"]   # red, orange, blue per band
@@ -86,7 +110,8 @@ _BAND_LABELS = {
     "1800-2199": "1800–2199",
 }
 
-GA_METHODS_CONV = ["STATIC", "COEVOLVE_FROZEN", "COEVOLVE"]
+# GA methods shown in convergence curves (only those with generation history).
+GA_METHODS_CONV = ["STATIC", "COEVOLVE"]
 
 
 # ── I/O ───────────────────────────────────────────────────────────────────────
@@ -562,8 +587,8 @@ def plot_ga_vs_nonga(runs: list[dict], out_path: str) -> None:
     """Bar chart: methods sorted by score within Non-GA / GA groups."""
     from matplotlib.patches import Patch
 
-    NGA = ["most_played_baseline", "RANDOM_SEARCH", "GREEDY_HILLCLIMB"]
-    GA  = ["STATIC", "COEVOLVE_FROZEN", "COEVOLVE"]
+    NGA = ["most_played_baseline", "GREEDY_HILLCLIMB"]
+    GA  = ["STATIC", "COEVOLVE"]
     metrics_info = [
         ("heldout_uniform_mean", "Mean Score (uniform opponent)"),
         ("heldout_worst_band",   "Worst-Band Score (robustness)"),
@@ -1475,10 +1500,289 @@ def write_repertoire_report(
         print(f"  saved -> {out_path}")
 
 
+# ── Closure ablation plot ─────────────────────────────────────────────────────
+
+def plot_closure_ablation(runs: list[dict], out_path: str) -> None:
+    """Side-by-side box+strip comparing closure ON vs OFF for STATIC and COEVOLVE.
+
+    This is the main novel-contribution validation plot. If the closure rule
+    helps, WITH-closure methods should consistently score higher.
+    """
+    groups = [
+        ("STATIC",            "STATIC_NOCLOSURE",   "Static GA"),
+        ("COEVOLVE",          "COEVOLVE_NOCLOSURE",  "CoEvolve"),
+    ]
+    metrics_info = [
+        ("heldout_uniform_mean", "Mean Score (uniform opponent)"),
+        ("heldout_worst_band",   "Worst-Band Score (robustness)"),
+    ]
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), sharey=False)
+    rng_j = np.random.default_rng(42)
+
+    for ax, (metric, ylabel) in zip(axes, metrics_info):
+        positions = []
+        all_data, colors, labels = [], [], []
+        tick_labels = []
+        pos = 0
+        group_centers = []
+
+        for with_m, without_m, title in groups:
+            group_start = pos
+            for m, linestyle in [(with_m, "Closure"), (without_m, "No Closure")]:
+                sel = _select(runs, mode=m, seeds=CLOSURE_ABLATION_SEEDS, lambda_weight=MAIN_LAMBDA)
+                vals = list(_scores_by_seed_metric(sel, metric).values())
+                if not vals:
+                    pos += 1
+                    continue
+                all_data.append(vals)
+                positions.append(pos)
+                colors.append(_METHOD_COLORS.get(m, "#888888"))
+                labels.append(f"{title}\n({linestyle})")
+                tick_labels.append(f"{title}\n{linestyle}")
+                pos += 1
+            group_centers.append((group_start + pos - 1) / 2)
+            pos += 0.6  # gap between groups
+
+        if not all_data:
+            ax.text(0.5, 0.5, "No ablation data yet", ha="center", va="center",
+                    transform=ax.transAxes, color="grey", fontsize=11)
+            ax.set_title(ylabel, fontsize=11)
+            continue
+
+        bp = ax.boxplot(
+            all_data, positions=positions, widths=0.4, patch_artist=True,
+            medianprops={"color": "black", "linewidth": 2},
+            whiskerprops={"linewidth": 1.2}, capprops={"linewidth": 1.2},
+            showfliers=False,
+        )
+        for patch, c in zip(bp["boxes"], colors):
+            patch.set_facecolor(c)
+            patch.set_alpha(0.5)
+
+        for pos_i, vals, c in zip(positions, all_data, colors):
+            jitter = rng_j.uniform(-0.12, 0.12, len(vals))
+            ax.scatter([pos_i + j for j in jitter], vals, color=c, s=26,
+                       alpha=0.85, zorder=4, edgecolors="white", linewidths=0.4)
+
+        ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.35)
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, fontsize=9)
+        ax.set_ylabel(ylabel, fontsize=10.5)
+        ax.set_title(ylabel, fontsize=11)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", alpha=0.25)
+
+    fig.suptitle(
+        "Closure Ablation: Does Forcing Opponent Reply Coverage Help?  (same seeds, paired)",
+        fontsize=11,
+    )
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_closure_threshold_sensitivity(runs: list[dict], out_path: str) -> None:
+    """Line plot: held-out score vs closure threshold for STATIC.
+
+    Shows whether CLOSURE_THRESHOLD = 0.15 is a good choice or if performance
+    changes significantly across the tested range.
+    """
+    metrics_info = [
+        ("heldout_uniform_mean", "Mean Score"),
+        ("heldout_worst_band",   "Worst-Band Score"),
+    ]
+    thresholds = CLOSURE_THRESHOLD_VALUES
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    for ax, (metric, ylabel) in zip(axes, metrics_info):
+        means, stds = [], []
+        for thresh in thresholds:
+            # Threshold-sweep runs store the threshold in their config dict.
+            sel = [r for r in runs
+                   if r.get("mode") == "STATIC"
+                   and r.get("seed") in CLOSURE_THRESHOLD_SEEDS
+                   and abs(r.get("config", {}).get("closure_threshold", -1) - thresh) < 1e-6]
+            vals = list(_scores_by_seed_metric(sel, metric).values())
+            means.append(float(np.mean(vals)) if vals else float("nan"))
+            stds.append(float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0)
+
+        means_a = np.array(means)
+        stds_a  = np.array(stds)
+
+        if np.all(np.isnan(means_a)):
+            ax.text(0.5, 0.5, "No threshold sweep data yet", ha="center", va="center",
+                    transform=ax.transAxes, color="grey", fontsize=11)
+        else:
+            ax.plot(thresholds, means_a, "o-", color=_METHOD_COLORS["STATIC"],
+                    linewidth=2, markersize=7)
+            ax.fill_between(thresholds, means_a - stds_a, means_a + stds_a,
+                            alpha=0.15, color=_METHOD_COLORS["STATIC"])
+            # Mark the default value we used in main experiments.
+            ax.axvline(0.15, color="grey", linestyle=":", linewidth=1.2, alpha=0.7,
+                       label="Default (0.15)")
+            ax.legend(fontsize=9)
+
+        ax.set_xlabel("Closure Threshold", fontsize=11)
+        ax.set_ylabel(ylabel, fontsize=10.5)
+        ax.set_title(ylabel, fontsize=11)
+        ax.set_xticks(thresholds)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(alpha=0.25)
+
+    fig.suptitle(
+        "Closure Threshold Sensitivity — STATIC GA  (shading = ±1 SD across 5 seeds)",
+        fontsize=11,
+    )
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_budget_sensitivity(runs: list[dict], out_path: str) -> None:
+    """Line plot: held-out score vs committed-move budget for STATIC.
+
+    Answers: does the 25-move budget saturate, or do larger budgets still improve?
+    """
+    metrics_info = [
+        ("heldout_uniform_mean", "Mean Score"),
+        ("heldout_worst_band",   "Worst-Band Score"),
+    ]
+    budgets = BUDGET_VALUES
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    for ax, (metric, ylabel) in zip(axes, metrics_info):
+        means, stds = [], []
+        for bgt in budgets:
+            sel = [r for r in runs
+                   if r.get("mode") == "STATIC"
+                   and r.get("seed") in BUDGET_SEEDS
+                   and r.get("config", {}).get("budget") == bgt]
+            vals = list(_scores_by_seed_metric(sel, metric).values())
+            means.append(float(np.mean(vals)) if vals else float("nan"))
+            stds.append(float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0)
+
+        means_a = np.array(means)
+        stds_a  = np.array(stds)
+
+        if np.all(np.isnan(means_a)):
+            ax.text(0.5, 0.5, "No budget sweep data yet", ha="center", va="center",
+                    transform=ax.transAxes, color="grey", fontsize=11)
+        else:
+            ax.plot(budgets, means_a, "o-", color=_METHOD_COLORS["STATIC"],
+                    linewidth=2, markersize=7)
+            ax.fill_between(budgets, means_a - stds_a, means_a + stds_a,
+                            alpha=0.15, color=_METHOD_COLORS["STATIC"])
+            ax.axvline(BUDGET, color="grey", linestyle=":", linewidth=1.2, alpha=0.7,
+                       label=f"Default ({BUDGET})")
+            ax.legend(fontsize=9)
+
+        ax.set_xlabel("Budget (committed moves per color)", fontsize=11)
+        ax.set_ylabel(ylabel, fontsize=10.5)
+        ax.set_title(ylabel, fontsize=11)
+        ax.set_xticks(budgets)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(alpha=0.25)
+
+    fig.suptitle(
+        "Budget Sensitivity — STATIC GA  (shading = ±1 SD across 5 seeds)",
+        fontsize=11,
+    )
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ── Opening diversity table ───────────────────────────────────────────────────
+
+def compute_opening_diversity_table(runs: list[dict], graph_train: dict) -> pd.DataFrame:
+    """For each method, count how many seeds chose each first White move.
+
+    Uses the existing _opening_name_for lookup to label the opening family.
+    This answers: does COEVOLVE produce more diverse openings than STATIC?
+    """
+    nodes = graph_train["nodes"]
+    root_fen = graph_train["root_fen"]
+
+    rows = []
+    for m in METHODS_MAIN:
+        sel = _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for r in sel:
+            cand = r.get("final_best_candidate")
+            if cand is None:
+                continue
+            w_committed = cand.get("white_committed", {})
+            first_move_uci = w_committed.get(root_fen)
+            if first_move_uci is None:
+                continue
+            root_node = nodes.get(root_fen)
+            if root_node is None:
+                continue
+            child_info = root_node["children"].get(first_move_uci)
+            first_move_san = child_info["move_san"] if child_info else first_move_uci
+            opening = _opening_name_for([first_move_san])
+            rows.append({
+                "method":     m,
+                "seed":       r.get("seed"),
+                "first_move": first_move_san,
+                "opening":    opening,
+            })
+
+    if not rows:
+        return pd.DataFrame(columns=["method", "seed", "first_move", "opening"])
+
+    df = pd.DataFrame(rows)
+    # Pivot to a count table: rows = methods, columns = first moves.
+    pivot = df.groupby(["method", "first_move"]).size().unstack(fill_value=0)
+    pivot = pivot.reindex([m for m in METHODS_MAIN if m in pivot.index])
+    return pivot
+
+
+# ── Compute cost table ────────────────────────────────────────────────────────
+
+def compute_compute_cost_table(runs: list[dict]) -> pd.DataFrame:
+    """Wall-clock time per method, using the wall_time_seconds field in each run pickle.
+
+    Useful for an honest 'is this worth the compute?' answer in the paper.
+    """
+    rows = []
+    for m in METHODS_MAIN:
+        sel = _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        times = [r["wall_time_seconds"] for r in sel if "wall_time_seconds" in r]
+        if not times:
+            continue
+        rows.append({
+            "method":        _METHOD_LABELS.get(m, m),
+            "median_sec":    float(np.median(times)),
+            "mean_sec":      float(np.mean(times)),
+            "std_sec":       float(np.std(times, ddof=1)) if len(times) > 1 else 0.0,
+            "median_min":    float(np.median(times)) / 60,
+        })
+    return pd.DataFrame(rows)
+
+
 # ── Top-level entry point ─────────────────────────────────────────────────────
 
-def run_analysis(runs_dir: str = "runs", results_dir: str = "results") -> None:
+def run_analysis(
+    runs_dir: str = "runs",
+    results_dir: str = "results",
+    include_appendix: bool = False,
+) -> None:
+    """Run the full analysis pipeline.
+
+    Core outputs are always produced. Appendix outputs (diagnostic plots,
+    sensitivity tables, etc.) are only produced when include_appendix=True.
+    Pass include_appendix=True for the final paper submission.
+    """
     Path(results_dir).mkdir(parents=True, exist_ok=True)
+    appendix_dir = os.path.join(results_dir, "appendix")
+    if include_appendix:
+        Path(appendix_dir).mkdir(parents=True, exist_ok=True)
 
     print(f"Loading runs from '{runs_dir}' ...")
     runs = load_runs(runs_dir)
@@ -1488,6 +1792,7 @@ def run_analysis(runs_dir: str = "runs", results_dir: str = "results") -> None:
     _augment_runs_with_metrics(runs)
     print("  done.\n")
 
+    # ── Core: main comparison table ───────────────────────────────────────────
     print("Computing main_table.csv ...")
     main_df = compute_main_table(runs)
     main_df.to_csv(os.path.join(results_dir, "main_table.csv"), index=False)
@@ -1495,6 +1800,7 @@ def run_analysis(runs_dir: str = "runs", results_dir: str = "results") -> None:
         print(f"\n[{metric}]")
         print(sub.drop(columns=["metric"]).to_string(index=False))
 
+    # ── Core: headline figures ────────────────────────────────────────────────
     print("\nPlotting convergence.png ...")
     plot_convergence(runs, os.path.join(results_dir, "convergence.png"))
     print("  saved.")
@@ -1507,57 +1813,96 @@ def run_analysis(runs_dir: str = "runs", results_dir: str = "results") -> None:
     plot_band_breakdown(runs, os.path.join(results_dir, "band_breakdown.png"))
     print("  saved.")
 
-    print("\nPlotting effect_sizes.png ...")
-    plot_effect_sizes(runs, os.path.join(results_dir, "effect_sizes.png"))
+    # ── Core: new ablation + sensitivity plots ────────────────────────────────
+    print("\nPlotting closure_ablation.png ...")
+    plot_closure_ablation(runs, os.path.join(results_dir, "closure_ablation.png"))
     print("  saved.")
 
-    print("\nPlotting ga_vs_nonga.png ...")
-    plot_ga_vs_nonga(runs, os.path.join(results_dir, "ga_vs_nonga.png"))
+    print("\nPlotting closure_threshold.png ...")
+    plot_closure_threshold_sensitivity(runs, os.path.join(results_dir, "closure_threshold.png"))
     print("  saved.")
 
-    print("\nPlotting white_black_breakdown.png ...")
-    plot_white_black_breakdown(runs, os.path.join(results_dir, "white_black_breakdown.png"))
+    print("\nPlotting budget_sensitivity.png ...")
+    plot_budget_sensitivity(runs, os.path.join(results_dir, "budget_sensitivity.png"))
     print("  saved.")
 
-    print("\nPlotting generalization.png ...")
-    plot_generalization(runs, os.path.join(results_dir, "generalization.png"))
-    print("  saved.")
+    # ── Core: post-hoc tables (no new runs needed) ────────────────────────────
+    # Opening diversity: which first move did each method choose across seeds?
+    graph_train_path = os.path.join("data", "graph_train.pkl")
+    if os.path.exists(graph_train_path):
+        print("\nComputing opening_diversity.csv ...")
+        with open(graph_train_path, "rb") as fh:
+            import pickle as _pkl
+            _graph = _pkl.load(fh)
+        div_df = compute_opening_diversity_table(runs, _graph)
+        div_df.to_csv(os.path.join(results_dir, "opening_diversity.csv"))
+        print(div_df.to_string())
+    else:
+        print("\n  [skip] opening_diversity: graph_train.pkl not found.")
 
-    print("\nPlotting generalization_gap.png ...")
-    plot_generalization_gap(runs, os.path.join(results_dir, "generalization_gap.png"))
-    print("  saved.")
+    print("\nComputing compute_cost.csv ...")
+    cost_df = compute_compute_cost_table(runs)
+    cost_df.to_csv(os.path.join(results_dir, "compute_cost.csv"), index=False)
+    print(cost_df.to_string(index=False))
 
-    print("\nPlotting repertoire_structure.png ...")
-    plot_repertoire_structure(runs, os.path.join(results_dir, "repertoire_structure.png"))
-    print("  saved.")
+    # ── Appendix: diagnostic and supplementary plots ──────────────────────────
+    if include_appendix:
+        out = appendix_dir
 
-    print("\nPlotting lambda_sensitivity.png ...")
-    plot_lambda_sensitivity_visual(runs, os.path.join(results_dir, "lambda_sensitivity.png"))
-    print("  saved.")
+        print("\n[appendix] Plotting effect_sizes.png ...")
+        plot_effect_sizes(runs, os.path.join(out, "effect_sizes.png"))
 
-    print("\nPlotting coevolve_dynamics.png ...")
-    plot_coevolve_dynamics(runs, os.path.join(results_dir, "coevolve_dynamics.png"))
-    print("  saved.")
+        print("[appendix] Plotting ga_vs_nonga.png ...")
+        plot_ga_vs_nonga(runs, os.path.join(out, "ga_vs_nonga.png"))
 
-    print("\nPlotting seed_heatmap.png ...")
-    plot_seed_heatmap(runs, os.path.join(results_dir, "seed_heatmap.png"))
-    print("  saved.")
+        print("[appendix] Plotting white_black_breakdown.png ...")
+        plot_white_black_breakdown(runs, os.path.join(out, "white_black_breakdown.png"))
 
-    print("\nComputing sensitivity_table.csv ...")
-    sens_df = compute_sensitivity_table(runs)
-    sens_df.to_csv(os.path.join(results_dir, "sensitivity_table.csv"), index=False)
-    print(sens_df.to_string(index=False))
+        print("[appendix] Plotting generalization.png ...")
+        plot_generalization(runs, os.path.join(out, "generalization.png"))
 
-    print("\nComputing diagnostic_table.csv ...")
-    diag_df = compute_diagnostic_table(runs)
-    diag_df.to_csv(os.path.join(results_dir, "diagnostic_table.csv"), index=False)
-    print(diag_df.to_string(index=False))
+        print("[appendix] Plotting generalization_gap.png ...")
+        plot_generalization_gap(runs, os.path.join(out, "generalization_gap.png"))
 
-    print("\nWriting repertoire_tree.txt + repertoire_grouped.txt ...")
-    write_repertoire_report(runs, results_dir)
+        print("[appendix] Plotting repertoire_structure.png ...")
+        plot_repertoire_structure(runs, os.path.join(out, "repertoire_structure.png"))
+
+        print("[appendix] Plotting lambda_sensitivity.png ...")
+        plot_lambda_sensitivity_visual(runs, os.path.join(out, "lambda_sensitivity.png"))
+
+        print("[appendix] Plotting coevolve_dynamics.png ...")
+        plot_coevolve_dynamics(runs, os.path.join(out, "coevolve_dynamics.png"))
+
+        print("[appendix] Plotting seed_heatmap.png ...")
+        plot_seed_heatmap(runs, os.path.join(out, "seed_heatmap.png"))
+
+        print("[appendix] Computing sensitivity_table.csv ...")
+        sens_df = compute_sensitivity_table(runs)
+        sens_df.to_csv(os.path.join(out, "sensitivity_table.csv"), index=False)
+        print(sens_df.to_string(index=False))
+
+        print("[appendix] Computing diagnostic_table.csv ...")
+        diag_df = compute_diagnostic_table(runs)
+        diag_df.to_csv(os.path.join(out, "diagnostic_table.csv"), index=False)
+        print(diag_df.to_string(index=False))
+
+        print("[appendix] Writing repertoire_tree.txt + repertoire_grouped.txt ...")
+        write_repertoire_report(runs, out)
+
+        print(f"  Appendix outputs saved to '{appendix_dir}/'.")
 
     print(f"\nDone — results saved to '{results_dir}/'.")
 
 
 if __name__ == "__main__":
-    run_analysis()
+    import argparse
+    parser = argparse.ArgumentParser(description="Run ChessRepertoire analysis")
+    parser.add_argument("--runs-dir",  default="runs",    help="Directory with run pickles")
+    parser.add_argument("--results-dir", default="results", help="Output directory")
+    parser.add_argument("--appendix", action="store_true", help="Also produce appendix figures")
+    args = parser.parse_args()
+    run_analysis(
+        runs_dir=args.runs_dir,
+        results_dir=args.results_dir,
+        include_appendix=args.appendix,
+    )

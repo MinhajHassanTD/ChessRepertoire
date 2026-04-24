@@ -31,6 +31,7 @@ from src.config import (
     LAMBDA_WEIGHT,
     OPPONENT_CROSSOVER_RATE,
     OPPONENT_MUTATION_RATE,
+    USE_CLOSURE,
 )
 from src.fitness import evaluate, evaluate_heldout
 from src.opponent import Opponent
@@ -138,18 +139,20 @@ def run_coevolution(
     mutation_rate: float = float(config.get("mutation_rate", MUTATION_RATE))
     hof_size: int = int(config.get("hof_size", HOF_SIZE))
     novelty_weight: float = float(config.get("novelty_weight", NOVELTY_WEIGHT))
+    # use_closure=False disables the auto-coverage rule (ablation experiment).
+    use_closure: bool = bool(config.get("use_closure", USE_CLOSURE))
 
     # ── Initialisation ────────────────────────────────────────────────────────
 
     R_pop: list[Candidate] = []
     half = pop_size_r // 2
     for _ in range(half):
-        w = construct_initial(graph_train, "white", BUDGET, rng)
-        b = construct_initial(graph_train, "black", BUDGET, rng)
+        w = construct_initial(graph_train, "white", BUDGET, rng, use_closure=use_closure)
+        b = construct_initial(graph_train, "black", BUDGET, rng, use_closure=use_closure)
         R_pop.append(Candidate(white=w, black=b, fitness=None, band_scores_cache=None))
     for _ in range(pop_size_r - half):
-        w = construct_random(graph_train, "white", BUDGET, rng)
-        b = construct_random(graph_train, "black", BUDGET, rng)
+        w = construct_random(graph_train, "white", BUDGET, rng, use_closure=use_closure)
+        b = construct_random(graph_train, "black", BUDGET, rng, use_closure=use_closure)
         R_pop.append(Candidate(white=w, black=b, fitness=None, band_scores_cache=None))
 
     if mode == "STATIC":
