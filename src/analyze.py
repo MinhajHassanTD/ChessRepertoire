@@ -818,7 +818,7 @@ def plot_repertoire_structure(runs: list[dict], out_path: str) -> None:
     width = 0.35
     labels_m = [_METHOD_LABELS[m] for m in METHODS_MAIN]
 
-    for ax, (key_w, key_b, ylabel, title, show_budget) in [
+    for ax, key_w, key_b, ylabel, title, show_budget in [
         (axes[0], "w_comm",  "b_comm",  "Committed Moves",     "(a) Budget Utilization",  True),
         (axes[1], "w_reach", "b_reach", "Positions in Subgraph","(b) Subgraph Coverage",  False),
     ]:
