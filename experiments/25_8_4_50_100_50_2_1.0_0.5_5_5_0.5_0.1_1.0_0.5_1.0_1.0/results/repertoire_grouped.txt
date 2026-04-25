@@ -1,0 +1,236 @@
+======================================================================
+  CHESS REPERTOIRE PROJECT
+  GROUPED BY OPENING — continuations shown after the opening header
+  Ranked by held-out fitness (lambda=1.0, best seed per mode)
+======================================================================
+
+######################################################################
+  MODE : COEVOLVE  |  SEED : 1013  |  HELDOUT_LEGACY : 1.0765  |  HELDOUT_UNIFORM : 0.5436  |  WHITE : 0.5369  |  BLACK : 0.5503
+  White committed : 17 moves  |  Black committed : 21 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nf3  d5)  ── 1 line  ──────────────────────────────
+       [end of line]
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nf3  e6)  ── 3 lines  ──────────────────────────────
+       3.c4  Bb4+  4.Bd2  Bxd2+
+       3.c4  Bb4+  4.Bd2  Qe7
+       3.c4  b6  4.g3
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nf3  g6)  ── 1 line  ──────────────────────────────
+       3.g3
+
+  ── Anti-Indian  (1.d4  d5  2.c4  Nf6)  ── 1 line  ────────────────────────────────
+       [end of line]
+
+  ── Slav Defense  (1.d4  d5  2.c4  c6)  ── 2 lines  ────────────────────────────────
+       3.Nc3  Nf6
+       3.Nc3  e6
+
+  ── Queen's Gambit Accepted  (1.d4  d5  2.c4  dxc4)  ── 5 lines  ───────────────────
+       3.e3  Nf6  4.Bxc4  Nc6  5.Ne2
+       3.e3  Nf6  4.Bxc4  e6  5.Nf3  Bb4+
+       3.e3  Nf6  4.Bxc4  e6  5.Nf3  Nc6
+       3.e3  b5  4.a4  Bd7
+       3.e3  b5  4.a4  c6  5.axb5  cxb5
+
+  ── Queen's Gambit Declined  (1.d4  d5  2.c4  e6)  ── 1 line  ─────────────────────
+       3.Nf3
+
+
+  ── AS BLACK ──
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Bf4  g6)  ── 5 lines  ──────────────────────────────
+       3.Nc3  Bg7  4.Nb5
+       3.Nc3  Bg7  4.e4  d6  5.Qd2
+       3.Nc3  Bg7  4.e4  d6  5.e5
+       3.Nf3  Bg7
+       3.e3  Bg7  4.Bd3
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nf3  g6)  ── 4 lines  ──────────────────────────────
+       3.Bf4  Bg7
+       3.c4
+       3.e3  Bg7  4.Bd3
+       3.e3  Bg7  4.c4  c5
+
+  ── Indian / QGD  (1.d4  Nf6  2.c4  e6)  ── 7 lines  ───────────────────────────────
+       3.Nc3  Bb4  4.Bd2
+       3.Nc3  Bb4  4.Bg5
+       3.Nc3  Bb4  4.Qc2
+       3.Nf3  d5  4.Bg5  b6
+       3.Nf3  d5  4.Nc3  Bb4  5.Bd2
+       3.Nf3  d5  4.Nc3  Bb4  5.Bg5
+       3.Nf3  d5  4.g3
+
+  ── Sicilian Defense  (1.e4  c5  2.Bc4  Nc6)  ── 2 lines  ──────────────────────────
+       3.Nf3  g6  4.Ng5
+       3.Nf3  g6  4.O-O
+
+  ── Sicilian — Classical  (1.e4  c5  2.Nf3  Nc6)  ── 3 lines  ──────────────────────
+       3.Bc4  g6  4.Ng5
+       3.Bc4  g6  4.O-O
+       3.d4  cxd4  4.Nxd4  Nxd4  5.Qxd4  d6
+
+
+######################################################################
+  MODE : STATIC  |  SEED : 1003  |  HELDOUT_LEGACY : 1.0756  |  HELDOUT_UNIFORM : 0.5432  |  WHITE : 0.5369  |  BLACK : 0.5494
+  White committed : 22 moves  |  Black committed : 21 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  ── Indian / QGD  (1.d4  Nf6  2.c4  e6)  ── 1 line  ───────────────────────────────
+       3.e3
+
+  ── King's Indian / Grünfeld  (1.d4  Nf6  2.c4  g6)  ── 2 lines  ───────────────────
+       3.Nc3  Bg7  4.e4  d6  5.Nf3  O-O  6.Be2
+       3.Nc3  d5  4.cxd5  Nxd5  5.e4  Nxc3  6.bxc3
+
+  ── Slav Defense  (1.d4  d5  2.c4  c6)  ── 3 lines  ────────────────────────────────
+       3.Nf3  Nf6  4.Nc3  Bf5  5.Bg5
+       3.Nf3  Nf6  4.Nc3  Bg4  5.e3
+       3.Nf3  Nf6  4.Nc3  e6  5.Bg5  Nbd7
+
+  ── Queen's Gambit Accepted  (1.d4  d5  2.c4  dxc4)  ── 3 lines  ───────────────────
+       3.e3  Nf6
+       3.e3  b5  4.a4  Bd7
+       3.e3  b5  4.a4  c6
+
+  ── Queen's Gambit Declined  (1.d4  d5  2.c4  e6)  ── 3 lines  ─────────────────────
+       3.e3  Nf6  4.Nc3  Bb4  5.Bd2  Bxc3
+       3.e3  Nf6  4.Nc3  Bb4  5.Bd2  O-O
+       3.e3  Nf6  4.Nc3  c5
+
+
+  ── AS BLACK ──
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Bf4  g6)  ── 4 lines  ──────────────────────────────
+       3.Nc3  Bg7  4.Nb5
+       3.Nc3  Bg7  4.e4  d6  5.Qd2
+       3.Nc3  Bg7  4.e4  d6  5.e5
+       3.e3  Bg7  4.Bd3
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nf3  g6)  ── 5 lines  ──────────────────────────────
+       3.c4
+       3.e3  Bg7  4.Bd3  O-O
+       3.e3  Bg7  4.c4  O-O  5.Bd3
+       3.e3  Bg7  4.c4  O-O  5.Be2
+       3.e3  Bg7  4.c4  O-O  5.Nc3
+
+  ── King's Indian / Grünfeld  (1.d4  Nf6  2.c4  g6)  ── 3 lines  ───────────────────
+       3.Nc3  d5  4.Nf3
+       3.Nc3  d5  4.cxd5  Nxd5  5.e4  Nxc3  6.bxc3
+       3.Nf3
+
+  ── Sicilian Defense  (1.e4  c5  2.Bc4  Nc6)  ── 1 line  ──────────────────────────
+       3.Nf3
+
+  ── Sicilian — Classical  (1.e4  c5  2.Nf3  Nc6)  ── 2 lines  ──────────────────────
+       3.Bc4
+       3.d4  cxd4  4.Nxd4  Nxd4  5.Qxd4  d6
+
+
+######################################################################
+  MODE : GREEDY_HILLCLIMB  |  SEED : 1009  |  HELDOUT_LEGACY : 1.0767  |  HELDOUT_UNIFORM : 0.5443  |  WHITE : 0.5401  |  BLACK : 0.5485
+  White committed : 25 moves  |  Black committed : 25 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  ── Grünfeld Defense  (1.d4  Nf6  2.c4  d5)  ── 4 lines  ───────────────────────────
+       3.cxd5  Nxd5  4.e4  Nb6
+       3.cxd5  Nxd5  4.e4  Nf6
+       3.cxd5  Qxd5  4.Nc3  Qa5
+       3.cxd5  Qxd5  4.Nc3  Qd8
+
+  ── Indian / QGD  (1.d4  Nf6  2.c4  e6)  ── 11 lines  ───────────────────────────────
+       3.Nf3  Bb4+  4.Nc3  O-O
+       3.Nf3  Bb4+  4.Nc3  b6
+       3.Nf3  Bb4+  4.Nc3  d5
+       3.Nf3  b6  4.Nc3  Bb4
+       3.Nf3  b6  4.Nc3  Bb7
+       3.Nf3  d5  4.Nc3  Bb4
+       3.Nf3  d5  4.Nc3  Be7  5.Bf4
+       3.Nf3  d5  4.Nc3  c6  5.e3  Bb4
+       3.Nf3  d5  4.Nc3  c6  5.e3  Bd6
+       3.Nf3  d5  4.Nc3  c6  5.e3  Be7
+       3.Nf3  d5  4.Nc3  c6  5.e3  Nbd7
+
+  ── King's Indian / Grünfeld  (1.d4  Nf6  2.c4  g6)  ── 2 lines  ───────────────────
+       3.Nc3  Bg7  4.e4  d6  5.Bd3
+       3.Nc3  d5  4.cxd5  Nxd5  5.e4  Nxc3  6.bxc3
+
+  ── Anti-Indian  (1.d4  d5  2.c4  Nf6)  ── 4 lines  ────────────────────────────────
+       3.cxd5  Nxd5  4.e4  Nb6
+       3.cxd5  Nxd5  4.e4  Nf6
+       3.cxd5  Qxd5  4.Nc3  Qa5
+       3.cxd5  Qxd5  4.Nc3  Qd8
+
+  ── Slav Defense  (1.d4  d5  2.c4  c6)  ── 6 lines  ────────────────────────────────
+       3.Nf3  Nf6  4.Nc3  Bf5
+       3.Nf3  Nf6  4.Nc3  Bg4
+       3.Nf3  Nf6  4.Nc3  e6  5.e3  Bb4
+       3.Nf3  Nf6  4.Nc3  e6  5.e3  Bd6
+       3.Nf3  Nf6  4.Nc3  e6  5.e3  Be7
+       3.Nf3  Nf6  4.Nc3  e6  5.e3  Nbd7
+
+  ── Queen's Gambit Accepted  (1.d4  d5  2.c4  dxc4)  ── 4 lines  ───────────────────
+       3.e3  Nf6  4.Bxc4  Nc6
+       3.e3  Nf6  4.Bxc4  e6
+       3.e3  b5  4.a4  Bd7
+       3.e3  b5  4.a4  c6  5.axb5  cxb5
+
+  ── Queen's Gambit Declined  (1.d4  d5  2.c4  e6)  ── 6 lines  ─────────────────────
+       3.Nf3  Nf6  4.Nc3  Bb4
+       3.Nf3  Nf6  4.Nc3  Be7  5.Bf4
+       3.Nf3  Nf6  4.Nc3  c6  5.e3  Bb4
+       3.Nf3  Nf6  4.Nc3  c6  5.e3  Bd6
+       3.Nf3  Nf6  4.Nc3  c6  5.e3  Be7
+       3.Nf3  Nf6  4.Nc3  c6  5.e3  Nbd7
+
+
+  ── AS BLACK ──
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Bf4  g6)  ── 5 lines  ──────────────────────────────
+       3.Nc3  Bg7  4.Nb5  d6
+       3.Nc3  Bg7  4.e4
+       3.Nf3  Bg7  4.e3
+       3.e3  Bg7  4.Bd3  O-O
+       3.e3  Bg7  4.Nf3
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nf3  g6)  ── 5 lines  ──────────────────────────────
+       3.Bf4  Bg7  4.e3
+       3.c4  Bg7  4.Nc3
+       3.c4  Bg7  4.e3
+       3.e3  Bg7  4.Bd3
+       3.e3  Bg7  4.c4
+
+  ── Indian / QGD  (1.d4  Nf6  2.c4  e6)  ── 5 lines  ───────────────────────────────
+       3.Nc3  Bb4  4.Bd2
+       3.Nc3  Bb4  4.Bg5  h6
+       3.Nc3  Bb4  4.Qc2
+       3.Nf3  b6  4.Nc3
+       3.Nf3  b6  4.g3
+
+  ── Sicilian Defense  (1.e4  c5  2.Bc4  Nc6)  ── 7 lines  ──────────────────────────
+       3.Nf3  e6  4.Nc3  Nf6  5.O-O
+       3.Nf3  e6  4.Nc3  Nf6  5.d3
+       3.Nf3  e6  4.Nc3  Nf6  5.d4
+       3.Nf3  e6  4.O-O  d5  5.exd5
+       3.Nf3  e6  4.c3  d5  5.exd5
+       3.Nf3  e6  4.d3  d5  5.exd5
+       3.Nf3  e6  4.d4
+
+  ── Sicilian — Classical  (1.e4  c5  2.Nf3  Nc6)  ── 8 lines  ──────────────────────
+       3.Bc4  e6  4.Nc3  Nf6  5.O-O
+       3.Bc4  e6  4.Nc3  Nf6  5.d3
+       3.Bc4  e6  4.Nc3  Nf6  5.d4
+       3.Bc4  e6  4.O-O  d5  5.exd5
+       3.Bc4  e6  4.c3  d5  5.exd5
+       3.Bc4  e6  4.d3  d5  5.exd5
+       3.Bc4  e6  4.d4
+       3.d4  cxd4  4.Nxd4  Nxd4  5.Qxd4  d6
+
+
