@@ -44,3 +44,19 @@ class Opponent:
         new_mix = w * self.mixture + (1.0 - w) * other.mixture
         new_mix = new_mix / new_mix.sum()
         return Opponent(new_mix)
+
+    def crossover_dirichlet(
+        self, other: "Opponent", rng, concentration: float = 3.0
+    ) -> "Opponent":
+        """Dirichlet-resample crossover.
+
+        Instead of returning the deterministic convex blend (which contracts the
+        population toward a centroid), this draws a sample from a Dirichlet
+        distribution whose concentration vector is proportional to the midpoint
+        of the two parents.  Lower concentration = wider spread around the
+        midpoint; higher = tighter (approaches the original convex blend).
+        """
+        blend = 0.5 * (self.mixture + other.mixture)
+        alpha = np.maximum(blend * concentration * _N_BANDS, 0.1)
+        new_mix = rng.dirichlet(alpha)
+        return Opponent(new_mix)

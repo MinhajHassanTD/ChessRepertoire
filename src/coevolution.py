@@ -31,6 +31,13 @@ from src.config import (
     LAMBDA_WEIGHT,
     OPPONENT_CROSSOVER_RATE,
     OPPONENT_MUTATION_RATE,
+    OPPONENT_CROSSOVER_CONCENTRATION,
+    OPPONENT_CROWDING_THRESHOLD,
+    OPPONENT_DIVERSITY_THRESHOLD,
+    OPPONENT_REINIT_FRACTION,
+    INIT_GREEDY_FRACTION,
+    REPERTOIRE_DIVERSITY_THRESHOLD,
+    REPERTOIRE_REINIT_FRACTION,
     USE_CLOSURE,
 )
 from src.fitness import evaluate, evaluate_heldout
@@ -142,15 +149,36 @@ def run_coevolution(
     # use_closure=False disables the auto-coverage rule (ablation experiment).
     use_closure: bool = bool(config.get("use_closure", USE_CLOSURE))
 
+    init_greedy_fraction: float = float(config.get("init_greedy_fraction", INIT_GREEDY_FRACTION))
+
+    opp_crossover_concentration: float = float(
+        config.get("opponent_crossover_concentration", OPPONENT_CROSSOVER_CONCENTRATION)
+    )
+    opp_crowding_threshold: float = float(
+        config.get("opponent_crowding_threshold", OPPONENT_CROWDING_THRESHOLD)
+    )
+    opp_diversity_threshold: float = float(
+        config.get("opponent_diversity_threshold", OPPONENT_DIVERSITY_THRESHOLD)
+    )
+    opp_reinit_fraction: float = float(
+        config.get("opponent_reinit_fraction", OPPONENT_REINIT_FRACTION)
+    )
+    rep_diversity_threshold: float = float(
+        config.get("repertoire_diversity_threshold", REPERTOIRE_DIVERSITY_THRESHOLD)
+    )
+    rep_reinit_fraction: float = float(
+        config.get("repertoire_reinit_fraction", REPERTOIRE_REINIT_FRACTION)
+    )
+
     # ── Initialisation ────────────────────────────────────────────────────────
 
     R_pop: list[Candidate] = []
-    half = pop_size_r // 2
-    for _ in range(half):
+    n_greedy = round(pop_size_r * init_greedy_fraction)
+    for _ in range(n_greedy):
         w = construct_initial(graph_train, "white", BUDGET, rng, use_closure=use_closure)
         b = construct_initial(graph_train, "black", BUDGET, rng, use_closure=use_closure)
         R_pop.append(Candidate(white=w, black=b, fitness=None, band_scores_cache=None))
-    for _ in range(pop_size_r - half):
+    for _ in range(pop_size_r - n_greedy):
         w = construct_random(graph_train, "white", BUDGET, rng, use_closure=use_closure)
         b = construct_random(graph_train, "black", BUDGET, rng, use_closure=use_closure)
         R_pop.append(Candidate(white=w, black=b, fitness=None, band_scores_cache=None))
@@ -225,6 +253,16 @@ def run_coevolution(
                 child = mutate_candidate(child, rng)
             child.band_scores_cache = None
             new_r_pop.append(child)
+
+        # Repertoire diversity maintenance: inject random individuals when collapsed.
+        if rep_diversity_threshold > 0.0 and rep_diversity < rep_diversity_threshold:
+            n_rep_reinit = max(1, round(pop_size_r * rep_reinit_fraction))
+            reinit_idx = rng.choice(pop_size_r, size=n_rep_reinit, replace=False)
+            for idx in reinit_idx:
+                w = construct_random(graph_train, "white", BUDGET, rng, use_closure=use_closure)
+                b = construct_random(graph_train, "black", BUDGET, rng, use_closure=use_closure)
+                new_r_pop[idx] = Candidate(white=w, black=b, fitness=None, band_scores_cache=None)
+
         R_pop = new_r_pop
 
         # Step 4: opponent evolution (COEVOLVE only)
@@ -245,18 +283,42 @@ def run_coevolution(
                     novelty = 0.0
                 opp.fitness = exploitation + novelty
 
+            # Reproduce opponents with Dirichlet-resample crossover.
             new_o_pop: list[Opponent] = []
             for _ in range(pop_size_o):
                 parent_a = _tournament_select(O_pop, rng, tournament_size)
                 if rng.random() < OPPONENT_CROSSOVER_RATE:
                     parent_b = _tournament_select(O_pop, rng, tournament_size)
-                    child_opp = parent_a.crossover(parent_b, rng)
+                    child_opp = parent_a.crossover_dirichlet(
+                        parent_b, rng, concentration=opp_crossover_concentration
+                    )
                 else:
                     child_opp = Opponent(parent_a.mixture.copy())
                 if rng.random() < OPPONENT_MUTATION_RATE:
                     child_opp = child_opp.mutate(rng)
                 new_o_pop.append(child_opp)
+
+            # Crowding: replace any near-duplicate offspring with a random opponent.
+            if opp_crowding_threshold > 0.0:
+                for i in range(len(new_o_pop)):
+                    for j in range(i + 1, len(new_o_pop)):
+                        if (
+                            np.linalg.norm(new_o_pop[i].mixture - new_o_pop[j].mixture)
+                            < opp_crowding_threshold
+                        ):
+                            new_o_pop[j] = Opponent.random(rng)
+
             O_pop = new_o_pop
+
+            # Diversity restart: if the population is still collapsed, reinitialise
+            # a fraction of it with fresh random opponents.
+            if opp_diversity_threshold > 0.0:
+                current_div = _mean_pairwise_opponent_distance(O_pop)
+                if current_div < opp_diversity_threshold:
+                    n_opp_reinit = max(1, round(len(O_pop) * opp_reinit_fraction))
+                    reinit_idx = rng.choice(len(O_pop), size=n_opp_reinit, replace=False)
+                    for idx in reinit_idx:
+                        O_pop[idx] = Opponent.random(rng)
 
             # Hall of Fame: keep the most informative opponents seen so far
             for opp in O_pop:
