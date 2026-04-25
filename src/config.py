@@ -41,7 +41,7 @@ MAX_PLY_DEPTH = 10
 # A child position is only enqueued if its move was played in at least this
 # fraction of aggregate games at the parent.
 # 0.10 = only follow moves played in >=10% of games. Lower = more positions.
-MIN_MOVE_FREQUENCY = 0.10
+MIN_MOVE_FREQUENCY = 0.05
 
 # Minimum number of aggregate games a child position must have to be enqueued,
 # depending on depth. Shallower positions need fewer games (they always have
@@ -49,9 +49,9 @@ MIN_MOVE_FREQUENCY = 0.10
 #   depth <= 3:  10,000 games
 #   depth <= 6:  30,000 games
 #   depth  > 6:  80,000 games
-MIN_GAMES_SHALLOW = 10_000   # ply depth 1–3
-MIN_GAMES_MID     = 30_000   # ply depth 4–6
-MIN_GAMES_DEEP    = 80_000   # ply depth 7+
+MIN_GAMES_SHALLOW = 5_000   # ply depth 1–3
+MIN_GAMES_MID     = 20_000   # ply depth 4–6
+MIN_GAMES_DEEP    = 50_000   # ply depth 7+
 MIN_GAMES_MID_CUTOFF    = 3  # depths <= this use MIN_GAMES_SHALLOW
 MIN_GAMES_DEEP_CUTOFF   = 6  # depths <= this use MIN_GAMES_MID
 
@@ -108,7 +108,7 @@ PRIOR_MAX_PLY = 8
 # positions.
 # Increase = bigger/more complete repertoire, harder search problem.
 # Decrease = simpler repertoire, easier to optimize.
-BUDGET = 30
+BUDGET = 25
 
 # Closure threshold: an opponent reply must be covered in the repertoire if
 # it appears in >= this fraction of games at a given position.
@@ -136,14 +136,14 @@ USE_CLOSURE = True
 
 # Number of repertoire candidates in the population.
 # More = better coverage of search space, slower per generation.
-POP_SIZE_REPERTOIRES = 100
+POP_SIZE_REPERTOIRES = 50
 
 # Number of opponent individuals in the population (COEVOLVE mode only).
 POP_SIZE_OPPONENTS = 50
 
 # Number of generations to run the GA.
 # More = more evolution time. Total evaluations = POP_SIZE_REPERTOIRES × N_GENERATIONS.
-N_GENERATIONS = 60
+N_GENERATIONS = 50
 
 # Tournament selection size. A random subset of this many individuals is drawn,
 # and the fittest wins. Larger = stronger selection pressure (good individuals
@@ -154,17 +154,30 @@ TOURNAMENT_SIZE = 2
 # Probability that two selected parents undergo crossover to produce a child.
 # If crossover does not trigger, the child is a clone of parent A.
 # 0.0 = no crossover (pure mutation), 1.0 = always crossover.
-CROSSOVER_RATE = 0.8
+CROSSOVER_RATE = 1.0
 
 # Probability that a mutation is applied to a child after crossover/cloning.
 # 0.0 = no mutation, 1.0 = always mutate.
-MUTATION_RATE = 0.3
+MUTATION_RATE = 0.5
 
 # Hall of Fame size (COEVOLVE mode only).
 # Keeps the N most informative past opponents seen during evolution, so
 # they can continue challenging the current population even after the live
 # opponent population has moved on. More = broader historical pressure.
-HOF_SIZE = 5
+HOF_SIZE = 10
+
+# Fraction of the initial repertoire population built with the greedy
+# (construct_initial) strategy vs randomly (construct_random).
+# Must sum to 1.0.  Adjust to bias initialisation toward principled or
+# exploratory starting points.
+INIT_GREEDY_FRACTION = 0.2
+INIT_RANDOM_FRACTION = 0.8
+
+# Mean pairwise Jaccard distance below which the repertoire population is
+# considered collapsed.  When triggered, the lowest-fitness REINIT_FRACTION
+# of the population is replaced with fresh random repertoires.
+REPERTOIRE_DIVERSITY_THRESHOLD = 0.4
+REPERTOIRE_REINIT_FRACTION     = 0.3
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. OPPONENT EVOLUTION  (src/opponent.py, src/coevolution.py)
@@ -173,7 +186,7 @@ HOF_SIZE = 5
 # Mutation strength for opponent chromosomes (fraction of Dirichlet noise).
 # new_mixture = (1 - strength) * old + strength * noise
 # 0.0 = no change, 1.0 = completely random. Controls how fast opponents drift.
-OPPONENT_MUTATION_STRENGTH = 0.5
+OPPONENT_MUTATION_STRENGTH = 0.8
 
 # Weight for the novelty (diversity) term in opponent fitness.
 # opponent_fitness = exploitation + NOVELTY_WEIGHT * diversity
@@ -181,15 +194,35 @@ OPPONENT_MUTATION_STRENGTH = 0.5
 # Diversity = mean L2 distance from this opponent to all others.
 # Higher novelty weight = opponents stay spread out (avoid all converging to
 # the same worst-case band). Set to 0.0 to disable diversity bonus.
-NOVELTY_WEIGHT = 0.4
+NOVELTY_WEIGHT = 1.0
 
 # Probability that two selected opponent parents undergo crossover.
 # 0.0 = always clone parent A, 1.0 = always crossover.
-OPPONENT_CROSSOVER_RATE = 0.8
+OPPONENT_CROSSOVER_RATE = 1.0
 
 # Probability that an opponent child is mutated after crossover/cloning.
 # 0.0 = no mutation, 1.0 = always mutate.
 OPPONENT_MUTATION_RATE = 0.5
+
+# Concentration scale for Dirichlet-resample crossover (replaces convex blend).
+# The two parent mixtures are averaged, then used as the concentration vector
+# for a Dirichlet draw scaled by this factor.
+# Low  (~1): wide spread around the midpoint — high offspring diversity.
+# High (~10): tight around the midpoint — similar to original convex blend.
+OPPONENT_CROSSOVER_CONCENTRATION = 3.0
+
+# L2 distance below which two opponents in the new population are considered
+# duplicates (crowding).  When a pair is closer than this threshold the later
+# member is replaced with a fresh random opponent.
+# Set to 0.0 to disable crowding entirely.
+OPPONENT_CROWDING_THRESHOLD = 0.05
+
+# Mean L2 distance below which the whole opponent population is considered
+# collapsed.  When triggered, OPPONENT_REINIT_FRACTION of the population is
+# replaced with fresh random opponents.
+# Set to 0.0 to disable diversity restart entirely.
+OPPONENT_DIVERSITY_THRESHOLD = 0.3
+OPPONENT_REINIT_FRACTION     = 0.40
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. FITNESS FUNCTION  (src/fitness.py)
@@ -217,8 +250,8 @@ LAMBDA_WEIGHT = 1.0
 # ─────────────────────────────────────────────────────────────────────────────
 
 # --- Main comparison experiment ---
-# Methods to compare: greedy baseline, static opponent, frozen opponent, co-evolved.
-MAIN_METHODS  = ["most_played_baseline", "STATIC", "COEVOLVE_FROZEN", "COEVOLVE"]
+# Methods to compare: greedy baseline, static opponent, co-evolved.
+MAIN_METHODS  = ["most_played_baseline", "STATIC", "COEVOLVE"]
 MAIN_LAMBDA   = 1.0         # lambda used for all main runs
 MAIN_SEEDS    = list(range(1000, 1015))   # 15 seeds → 15 independent runs per method
 
@@ -227,13 +260,7 @@ MAIN_SEEDS    = list(range(1000, 1015))   # 15 seeds → 15 independent runs per
 # This ensures fair comparison: baselines get the same number of fitness calls.
 BASELINE_METHODS = ["RANDOM_SEARCH", "GREEDY_HILLCLIMB"]
 BASELINE_SEEDS   = list(range(1000, 1015))
-GA_EVAL_BUDGET   = POP_SIZE_REPERTOIRES * N_GENERATIONS  # = 1500
-
-# --- Lambda sensitivity experiment ---
-# Tests how much the LAMBDA_WEIGHT knob matters.
-SENSITIVITY_METHODS = ["STATIC", "COEVOLVE"]
-SENSITIVITY_LAMBDAS = [0.0, 1.0, 2.0]
-SENSITIVITY_SEEDS   = list(range(2000, 2005))   # 5 seeds (smaller — just sensitivity)
+GA_EVAL_BUDGET   = POP_SIZE_REPERTOIRES * N_GENERATIONS  # = 6000
 
 # --- Closure-constraint ablation ---
 # The key novel contribution: does the closure rule actually help?
@@ -242,15 +269,3 @@ SENSITIVITY_SEEDS   = list(range(2000, 2005))   # 5 seeds (smaller — just sens
 # 2 methods × 15 seeds = 30 new runs.
 CLOSURE_ABLATION_METHODS = ["STATIC_NOCLOSURE", "COEVOLVE_NOCLOSURE"]
 CLOSURE_ABLATION_SEEDS   = list(range(1000, 1015))   # same 15 seeds as main
-
-# --- Closure threshold sensitivity ---
-# Is CLOSURE_THRESHOLD = 0.15 the right value, or does performance change a lot?
-# STATIC only (cheaper) × 5 thresholds × 5 seeds = 25 new runs.
-CLOSURE_THRESHOLD_VALUES = [0.05, 0.10, 0.15, 0.20, 0.30]
-CLOSURE_THRESHOLD_SEEDS  = list(range(2000, 2005))   # 5 seeds
-
-# --- Budget sensitivity (optional) ---
-# Does performance plateau before the 25-move budget, or continue growing?
-# STATIC only × 3 budgets × 5 seeds = 15 new runs.
-BUDGET_VALUES = [15, 25, 35]
-BUDGET_SEEDS  = list(range(2000, 2005))   # 5 seeds
