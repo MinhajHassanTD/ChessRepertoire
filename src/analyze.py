@@ -44,11 +44,11 @@ from src.config import (
 
 METHODS_MAIN = [
     "most_played_baseline",  # human heuristic baseline
-    "GREEDY_HILLCLIMB",      # non-GA search baseline (same eval budget as GA)
+    "RANDOM_SEARCH",         # random search with same eval budget as GA
+    "GREEDY_HILLCLIMB",      # greedy hill-climb with same eval budget as GA
     "STATIC",                # GA with fixed uniform opponent
     "COEVOLVE",              # GA with co-evolving opponent population
 ]
-NON_STATIC_METHODS = [m for m in METHODS_MAIN if m != "STATIC"]
 
 HELDOUT_METRICS = [
     "heldout_uniform_mean",   # average win-rate across all 3 bands under uniform opponent
@@ -250,40 +250,78 @@ def _scores_by_seed_metric(runs: list[dict], metric: str) -> dict[int, float]:
 
 # ── Main table ────────────────────────────────────────────────────────────────
 
-def compute_main_table(runs: list[dict]) -> pd.DataFrame:
-    filtered_by_method: dict[str, list[dict]] = {
+def compute_summary_table(runs: list[dict]) -> pd.DataFrame:
+    """Mean, std, median per method per metric — no statistical tests."""
+    filtered = {
         m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
         for m in METHODS_MAIN
     }
-
-    all_rows: list[dict] = []
-
+    rows: list[dict] = []
     for metric in HELDOUT_METRICS:
-        method_scores: dict[str, dict[int, float]] = {
-            m: _scores_by_seed_metric(filtered_by_method[m], metric)
-            for m in METHODS_MAIN
+        for m in METHODS_MAIN:
+            scores = list(_scores_by_seed_metric(filtered[m], metric).values())
+            rows.append({
+                "metric": metric,
+                "method": m,
+                "n":      len(scores),
+                "mean":   float(np.mean(scores))            if scores else float("nan"),
+                "std":    float(np.std(scores, ddof=1))     if len(scores) > 1 else 0.0,
+                "median": float(np.median(scores))          if scores else float("nan"),
+            })
+    return pd.DataFrame(rows)
+
+
+def _wilcoxon_safe(x: list[float], y: list[float]) -> float:
+    """Paired Wilcoxon p-value; returns 1.0 on degenerate input."""
+    if len(x) < 2:
+        return float("nan")
+    diffs = [xi - yi for xi, yi in zip(x, y)]
+    if all(d == 0.0 for d in diffs):
+        return 1.0
+    try:
+        _, pval = stats.wilcoxon(x, y, zero_method="wilcox")
+        return float(pval)
+    except ValueError:
+        return 1.0
+
+
+def compute_pairwise_table(runs: list[dict]) -> pd.DataFrame:
+    """All-pairs Wilcoxon signed-rank + A12 with Holm correction per metric.
+
+    Every ordered pair (method_a, method_b) where method_a appears before
+    method_b in METHODS_MAIN.  A12 > 0.5 means method_a tends higher.
+    """
+    filtered = {
+        m: _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        for m in METHODS_MAIN
+    }
+    pairs = [
+        (METHODS_MAIN[i], METHODS_MAIN[j])
+        for i in range(len(METHODS_MAIN))
+        for j in range(i + 1, len(METHODS_MAIN))
+    ]
+
+    rows: list[dict] = []
+    for metric in HELDOUT_METRICS:
+        method_scores = {
+            m: _scores_by_seed_metric(filtered[m], metric) for m in METHODS_MAIN
         }
-        static_by_seed = method_scores["STATIC"]
 
+        # Collect raw p-values for all pairs in this metric
+        pair_data: list[tuple] = []
         raw_p: list[float] = []
-        for m in NON_STATIC_METHODS:
-            m_by_seed = method_scores[m]
-            shared_seeds = sorted(set(m_by_seed) & set(static_by_seed))
-            if len(shared_seeds) < 2:
+        for a, b in pairs:
+            shared = sorted(set(method_scores[a]) & set(method_scores[b]))
+            if len(shared) < 2:
                 raw_p.append(float("nan"))
+                pair_data.append((a, b, [], []))
                 continue
-            x = [m_by_seed[s] for s in shared_seeds]
-            y = [static_by_seed[s] for s in shared_seeds]
-            diffs = [xi - yi for xi, yi in zip(x, y)]
-            if all(d == 0.0 for d in diffs):
-                raw_p.append(1.0)
-            else:
-                try:
-                    _, pval = stats.wilcoxon(x, y, zero_method="wilcox")
-                    raw_p.append(float(pval))
-                except ValueError:
-                    raw_p.append(1.0)
+            x = [method_scores[a][s] for s in shared]
+            y = [method_scores[b][s] for s in shared]
+            raw_p.append(_wilcoxon_safe(x, y))
+            pair_data.append((a, b, x, y))
 
+        # Holm-correct all finite p-values for this metric together
         nan_mask = [np.isnan(p) for p in raw_p]
         finite_p = [p for p in raw_p if not np.isnan(p)]
         corrected_finite = _holm_correct(finite_p)
@@ -294,39 +332,88 @@ def compute_main_table(runs: list[dict]) -> pd.DataFrame:
                 corrected_p.append(float("nan"))
             else:
                 corrected_p.append(corrected_finite[fi]); fi += 1
-        non_static_corrected = {m: corrected_p[i] for i, m in enumerate(NON_STATIC_METHODS)}
 
-        for m in METHODS_MAIN:
-            scores = list(method_scores[m].values())
-            if scores:
-                mean_h = float(np.mean(scores))
-                std_h = float(np.std(scores, ddof=1)) if len(scores) > 1 else 0.0
-                median_h = float(np.median(scores))
-            else:
-                mean_h = std_h = median_h = float("nan")
-
-            if m == "STATIC":
-                wilcoxon_p = float("nan")
-                a12 = float("nan")
-            else:
-                wilcoxon_p = non_static_corrected.get(m, float("nan"))
-                m_by_seed = method_scores[m]
-                shared = sorted(set(m_by_seed) & set(static_by_seed))
-                x = [m_by_seed[s] for s in shared]
-                y = [static_by_seed[s] for s in shared]
-                a12 = _a12(x, y)
-
-            all_rows.append({
-                "metric":               metric,
-                "method":               m,
-                "mean":                 mean_h,
-                "std":                  std_h,
-                "median":               median_h,
-                "wilcoxon_p_vs_STATIC": wilcoxon_p,
-                "A12_vs_STATIC":        a12,
+        for (a, b, x, y), cp in zip(pair_data, corrected_p):
+            mean_a = float(np.mean(x)) if x else float("nan")
+            mean_b = float(np.mean(y)) if y else float("nan")
+            rows.append({
+                "metric":          metric,
+                "method_a":        a,
+                "method_b":        b,
+                "mean_a":          mean_a,
+                "mean_b":          mean_b,
+                "delta":           mean_a - mean_b if x and y else float("nan"),
+                "wilcoxon_p":      cp,
+                "A12":             _a12(x, y) if x and y else float("nan"),
+                "significant_p05": bool(not np.isnan(cp) and cp < 0.05),
             })
 
-    return pd.DataFrame(all_rows)
+    return pd.DataFrame(rows)
+
+
+def compute_closure_ablation_table(runs: list[dict]) -> pd.DataFrame:
+    """Paired Wilcoxon + A12 for closure ON vs OFF (Holm-corrected across all tests).
+
+    Uses CLOSURE_ABLATION_SEEDS (2000–2014), not MAIN_SEEDS.
+    A12 > 0.5 means the with-closure method tends higher.
+    """
+    pairs = [
+        ("STATIC",   "STATIC_NOCLOSURE"),
+        ("COEVOLVE", "COEVOLVE_NOCLOSURE"),
+    ]
+
+    # Gather all (metric, pair) combos together for a single Holm correction pass
+    all_raw_p: list[float] = []
+    all_info:  list[tuple] = []
+
+    for metric in HELDOUT_METRICS:
+        for with_m, without_m in pairs:
+            with_scores    = _scores_by_seed_metric(
+                _select(runs, mode=with_m,    seeds=CLOSURE_ABLATION_SEEDS, lambda_weight=MAIN_LAMBDA),
+                metric,
+            )
+            without_scores = _scores_by_seed_metric(
+                _select(runs, mode=without_m, seeds=CLOSURE_ABLATION_SEEDS, lambda_weight=MAIN_LAMBDA),
+                metric,
+            )
+            shared = sorted(set(with_scores) & set(without_scores))
+            if len(shared) < 2:
+                all_raw_p.append(float("nan"))
+                all_info.append((metric, with_m, without_m, [], []))
+                continue
+            x = [with_scores[s]    for s in shared]
+            y = [without_scores[s] for s in shared]
+            all_raw_p.append(_wilcoxon_safe(x, y))
+            all_info.append((metric, with_m, without_m, x, y))
+
+    nan_mask = [np.isnan(p) for p in all_raw_p]
+    finite_p = [p for p in all_raw_p if not np.isnan(p)]
+    corrected_finite = _holm_correct(finite_p)
+    corrected_p2: list[float] = []
+    fi = 0
+    for is_nan in nan_mask:
+        if is_nan:
+            corrected_p2.append(float("nan"))
+        else:
+            corrected_p2.append(corrected_finite[fi]); fi += 1
+
+    rows: list[dict] = []
+    for (metric, with_m, without_m, x, y), cp in zip(all_info, corrected_p2):
+        mean_with    = float(np.mean(x)) if x else float("nan")
+        mean_without = float(np.mean(y)) if y else float("nan")
+        rows.append({
+            "metric":          metric,
+            "method_with":     with_m,
+            "method_without":  without_m,
+            "mean_with":       mean_with,
+            "mean_without":    mean_without,
+            "delta":           mean_with - mean_without if x and y else float("nan"),
+            "wilcoxon_p":      cp,
+            "A12":             _a12(x, y) if x and y else float("nan"),
+            "significant_p05": bool(not np.isnan(cp) and cp < 0.05),
+        })
+
+    return pd.DataFrame(rows)
 
 
 # ── Convergence plot ──────────────────────────────────────────────────────────
@@ -554,7 +641,7 @@ def plot_ga_vs_nonga(runs: list[dict], out_path: str) -> None:
     """Bar chart: methods sorted by score within Non-GA / GA groups."""
     from matplotlib.patches import Patch
 
-    NGA = ["most_played_baseline", "GREEDY_HILLCLIMB"]
+    NGA = ["most_played_baseline", "RANDOM_SEARCH", "GREEDY_HILLCLIMB"]
     GA  = ["STATIC", "COEVOLVE"]
     metrics_info = [
         ("heldout_uniform_mean", "Mean Score (uniform opponent)"),
@@ -1285,12 +1372,24 @@ def run_analysis(
     _augment_runs_with_metrics(runs)
     print("  done.\n")
 
-    print("Computing main_table.csv ...")
-    main_df = compute_main_table(runs)
-    main_df.to_csv(os.path.join(results_dir, "main_table.csv"), index=False)
-    for metric, sub in main_df.groupby("metric", sort=False):
+    print("Computing summary_table.csv ...")
+    summary_df = compute_summary_table(runs)
+    summary_df.to_csv(os.path.join(results_dir, "summary_table.csv"), index=False)
+    for metric, sub in summary_df.groupby("metric", sort=False):
         print(f"\n[{metric}]")
         print(sub.drop(columns=["metric"]).to_string(index=False))
+
+    print("\nComputing pairwise_table.csv ...")
+    pairwise_df = compute_pairwise_table(runs)
+    pairwise_df.to_csv(os.path.join(results_dir, "pairwise_table.csv"), index=False)
+    for metric, sub in pairwise_df.groupby("metric", sort=False):
+        print(f"\n[{metric}]")
+        print(sub.drop(columns=["metric"]).to_string(index=False))
+
+    print("\nComputing closure_ablation_table.csv ...")
+    ablation_df = compute_closure_ablation_table(runs)
+    ablation_df.to_csv(os.path.join(results_dir, "closure_ablation_table.csv"), index=False)
+    print(ablation_df.to_string(index=False))
 
     print("\nPlotting convergence.png ...")
     plot_convergence(runs, os.path.join(results_dir, "convergence.png"))
