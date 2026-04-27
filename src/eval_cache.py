@@ -51,11 +51,12 @@ def build_eval_cache(graph: dict) -> dict:
             stats = node["band_stats"][band]
             n = stats["games"]
             if n == 0:
-                shrunk = prior_mean
+                score = prior_mean
             else:
                 raw = (stats["wins"] + 0.5 * stats["draws"]) / n
-                shrunk = (n * raw + TAU * prior_mean) / (n + TAU)
-            band_scores[band] = shrunk
+                # shrunk = (n * raw + TAU * prior_mean) / (n + TAU)  # shrinkage (disabled)
+                score = raw
+            band_scores[band] = score
         scores[fen] = band_scores
 
     return {"prior_mean": prior_mean, "scores": scores}

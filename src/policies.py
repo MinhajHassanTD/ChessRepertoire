@@ -54,16 +54,16 @@ def compute_policies(graph: dict) -> dict:
                 for m, c in children.items()
             }
 
-        # ── per-band smoothed policy ──────────────────────────────────────────
+        # ── per-band policy (no smoothing — all positions have band_total > 0) ──
         for band in RATING_BANDS:
             band_total = sum(c["band_counts"][band] for c in children.values())
 
             policy: Dict[str, float] = {}
             for m, c in children.items():
                 band_count = c["band_counts"][band]
-                numerator = band_count + ALPHA * agg_prob[m]
-                denominator = band_total + ALPHA
-                policy[m] = numerator / denominator
+                # numerator = band_count + ALPHA * agg_prob[m]  # Laplace smoothing (disabled)
+                # denominator = band_total + ALPHA               # Laplace smoothing (disabled)
+                policy[m] = band_count / band_total if band_total > 0 else agg_prob[m]
 
             base_policies[band][fen] = policy
 

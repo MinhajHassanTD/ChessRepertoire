@@ -76,15 +76,15 @@ API_SPEEDS = "rapid,classical"
 # Higher ALPHA = band policies look more like the all-bands average (less noisy
 # for sparse positions but less band-specific). Lower = more band-specific but
 # noisier on rare positions.
-SMOOTHING_ALPHA = 5.0
+SMOOTHING_ALPHA = 10.0
 
 # Minimum TV (Total Variation) distance between band policies.
 # If bands are too similar, the worst-case (CVaR) objective loses meaning.
 # A warning is printed if mean TV distance falls below this threshold.
-BAND_SEPARATION_MIN_TV = 0.05
+BAND_SEPARATION_MIN_TV = 0.15
 
 # Minimum games at a position for it to count in the band separation check.
-BAND_SEPARATION_MIN_GAMES = 200
+BAND_SEPARATION_MIN_GAMES = 500
 
 # --- Empirical Bayes shrinkage (eval_cache.py) ---
 # When computing expected win-rate scores, we shrink toward a prior mean.
@@ -92,12 +92,12 @@ BAND_SEPARATION_MIN_GAMES = 200
 # gets a score of: (N*raw + TAU*prior_mean) / (N + TAU).
 # Higher TAU = more shrinkage toward the prior (safer for sparse data but
 # slower to differentiate positions). Lower = trust raw win-rates more.
-SHRINKAGE_TAU = 20
+SHRINKAGE_TAU = 100
 
 # Which ply depths to use when computing the prior mean.
 # Only positions at ply_depth <= this value are used. Shallow positions have
 # the most games so they give the most reliable prior estimate.
-PRIOR_MAX_PLY = 8
+PRIOR_MAX_PLY = 10
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. REPERTOIRE CHROMOSOME  (src/repertoire.py)
@@ -114,7 +114,7 @@ BUDGET = 25
 # it appears in >= this fraction of games at a given position.
 # 0.05 = cover any move played in >=5% of games. Raise to reduce the size of
 # forced coverage (fewer required moves); lower to be more comprehensive.
-CLOSURE_THRESHOLD = 0.15
+CLOSURE_THRESHOLD = 0.20
 
 # How many times to retry a mutation before giving up and returning a clone.
 # More retries = more likely to succeed but slower per generation.
@@ -122,7 +122,7 @@ MUTATION_RETRIES = 5
 
 # Maximum ply depth at which a committed node is eligible for opening replacement.
 # Nodes at ply_depth <= this value can have their subtree replaced wholesale.
-OPENING_REPLACEMENT_MAX_PLY = 4
+OPENING_REPLACEMENT_MAX_PLY = 5
 
 # Whether to apply the closure rule during construction and mutation.
 # True  = standard mode: auto-cover all opponent replies >= CLOSURE_THRESHOLD.
@@ -186,7 +186,7 @@ REPERTOIRE_REINIT_FRACTION     = 0.3
 # Mutation strength for opponent chromosomes (fraction of Dirichlet noise).
 # new_mixture = (1 - strength) * old + strength * noise
 # 0.0 = no change, 1.0 = completely random. Controls how fast opponents drift.
-OPPONENT_MUTATION_STRENGTH = 0.8
+OPPONENT_MUTATION_STRENGTH = 1.0
 
 # Weight for the novelty (diversity) term in opponent fitness.
 # opponent_fitness = exploitation + NOVELTY_WEIGHT * diversity
@@ -209,7 +209,7 @@ OPPONENT_MUTATION_RATE = 0.5
 # for a Dirichlet draw scaled by this factor.
 # Low  (~1): wide spread around the midpoint — high offspring diversity.
 # High (~10): tight around the midpoint — similar to original convex blend.
-OPPONENT_CROSSOVER_CONCENTRATION = 2.0
+OPPONENT_CROSSOVER_CONCENTRATION = 4.0
 
 # L2 distance below which two opponents in the new population are considered
 # duplicates (crowding).  When a pair is closer than this threshold the later
@@ -221,8 +221,8 @@ OPPONENT_CROWDING_THRESHOLD = 0.05
 # collapsed.  When triggered, OPPONENT_REINIT_FRACTION of the population is
 # replaced with fresh random opponents.
 # Set to 0.0 to disable diversity restart entirely.
-OPPONENT_DIVERSITY_THRESHOLD = 0.3
-OPPONENT_REINIT_FRACTION     = 0.40
+OPPONENT_DIVERSITY_THRESHOLD = 0.25
+OPPONENT_REINIT_FRACTION     = 0.30
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. FITNESS FUNCTION  (src/fitness.py)
@@ -253,13 +253,13 @@ LAMBDA_WEIGHT = 1.0
 # Methods to compare: greedy baseline, static opponent, co-evolved.
 MAIN_METHODS  = ["most_played_baseline", "STATIC", "COEVOLVE"]
 MAIN_LAMBDA   = 1.0         # lambda used for all main runs
-MAIN_SEEDS    = list(range(1000, 1015))   # 15 seeds → 15 independent runs per method
+MAIN_SEEDS    = list(range(1000, 1030))   # 15 seeds → 15 independent runs per method
 
 # --- Non-GA baselines ---
 # Total evaluation budget = POP_SIZE_REPERTOIRES × N_GENERATIONS (same as the GA).
 # This ensures fair comparison: baselines get the same number of fitness calls.
 BASELINE_METHODS = ["RANDOM_SEARCH", "GREEDY_HILLCLIMB"]
-BASELINE_SEEDS   = list(range(1000, 1015))
+BASELINE_SEEDS   = list(range(1000, 1030))
 GA_EVAL_BUDGET   = POP_SIZE_REPERTOIRES * N_GENERATIONS  # = 6000
 
 # --- Closure-constraint ablation ---
@@ -268,4 +268,4 @@ GA_EVAL_BUDGET   = POP_SIZE_REPERTOIRES * N_GENERATIONS  # = 6000
 # using the same seeds so results are paired (same random initialisation).
 # 2 methods × 15 seeds = 30 new runs.
 CLOSURE_ABLATION_METHODS = ["STATIC_NOCLOSURE", "COEVOLVE_NOCLOSURE"]
-CLOSURE_ABLATION_SEEDS   = list(range(1000, 1015))   # same 15 seeds as main
+CLOSURE_ABLATION_SEEDS   = list(range(1000, 1030))   # same 15 seeds as main
