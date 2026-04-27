@@ -143,13 +143,13 @@ POP_SIZE_OPPONENTS = 50
 
 # Number of generations to run the GA.
 # More = more evolution time. Total evaluations = POP_SIZE_REPERTOIRES × N_GENERATIONS.
-N_GENERATIONS = 50
+N_GENERATIONS = 100
 
 # Tournament selection size. A random subset of this many individuals is drawn,
 # and the fittest wins. Larger = stronger selection pressure (good individuals
 # dominate faster but diversity drops). Smaller = weaker selection (slower
 # but more diversity preserved). Must be <= population size.
-TOURNAMENT_SIZE = 2
+TOURNAMENT_SIZE = 4
 
 # Probability that two selected parents undergo crossover to produce a child.
 # If crossover does not trigger, the child is a clone of parent A.
@@ -170,13 +170,13 @@ HOF_SIZE = 10
 # (construct_initial) strategy vs randomly (construct_random).
 # Must sum to 1.0.  Adjust to bias initialisation toward principled or
 # exploratory starting points.
-INIT_GREEDY_FRACTION = 0.2
-INIT_RANDOM_FRACTION = 0.8
+INIT_GREEDY_FRACTION = 0.0
+INIT_RANDOM_FRACTION = 1.0
 
 # Mean pairwise Jaccard distance below which the repertoire population is
 # considered collapsed.  When triggered, the lowest-fitness REINIT_FRACTION
 # of the population is replaced with fresh random repertoires.
-REPERTOIRE_DIVERSITY_THRESHOLD = 0.4
+REPERTOIRE_DIVERSITY_THRESHOLD = 0.3
 REPERTOIRE_REINIT_FRACTION     = 0.3
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -209,7 +209,7 @@ OPPONENT_MUTATION_RATE = 0.5
 # for a Dirichlet draw scaled by this factor.
 # Low  (~1): wide spread around the midpoint — high offspring diversity.
 # High (~10): tight around the midpoint — similar to original convex blend.
-OPPONENT_CROSSOVER_CONCENTRATION = 3.0
+OPPONENT_CROSSOVER_CONCENTRATION = 2.0
 
 # L2 distance below which two opponents in the new population are considered
 # duplicates (crowding).  When a pair is closer than this threshold the later
