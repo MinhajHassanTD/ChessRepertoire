@@ -13,14 +13,17 @@ Outputs (all written to results/):
     repertoire_structure.png    — committed moves + subgraph size per method
     coevolve_dynamics.png       — COEVOLVE internal dynamics (3-panel)
     diagnostic_table.csv        — COEVOLVE per-generation averages
+    runtime_table.csv           — wall-clock time per method: mean/std/min/max across seeds
     repertoire_tree.txt         — best candidate per GA mode as a decision tree
     repertoire_grouped.txt      — best candidate grouped by opening family
+    repertoire_graph_*.png      — paper-ready 2D tree figures (White + Black panels per method)
 """
 
 from __future__ import annotations
 
 import os
 import pickle
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -853,6 +856,28 @@ def plot_coevolve_dynamics(runs: list[dict], out_path: str) -> None:
     plt.close(fig)
 
 
+# ── Runtime table ─────────────────────────────────────────────────────────────
+
+def compute_runtime_table(runs: list[dict]) -> pd.DataFrame:
+    """Wall-clock seconds per method across MAIN_SEEDS: mean, std, min, max."""
+    rows: list[dict] = []
+    for m in METHODS_MAIN:
+        selected = _select(runs, mode=m, seeds=MAIN_SEEDS, lambda_weight=MAIN_LAMBDA)
+        times = [r["wall_time_seconds"] for r in selected if "wall_time_seconds" in r]
+        if not times:
+            continue
+        rows.append({
+            "method":    m,
+            "n_seeds":   len(times),
+            "mean_s":    float(np.mean(times)),
+            "std_s":     float(np.std(times, ddof=1)) if len(times) > 1 else 0.0,
+            "min_s":     float(np.min(times)),
+            "max_s":     float(np.max(times)),
+            "mean_min":  float(np.mean(times)) / 60.0,
+        })
+    return pd.DataFrame(rows)
+
+
 # ── Diagnostic table (COEVOLVE only) ──────────────────────────────────────────
 
 def compute_diagnostic_table(runs: list[dict]) -> pd.DataFrame:
@@ -1357,6 +1382,313 @@ def plot_closure_ablation(runs: list[dict], out_path: str) -> None:
 
 # ── Top-level entry point ─────────────────────────────────────────────────────
 
+# ── Repertoire graph figures ───────────────────────────────────────────────────
+
+def _rep_tree_depth(s: str) -> int:
+    """Count │ groups before the ├/└ connector in a stripped tree line."""
+    i, depth = 0, 0
+    while i < len(s):
+        if s[i:i+3] in ("│  ", "   "):
+            depth += 1
+            i += 3
+        else:
+            break
+    return depth
+
+
+def _parse_rep_section(lines: list[str], is_white: bool, max_depth: int = 2):
+    """Parse one White or Black section into (G, root_id).
+
+    Nodes carry attrs: label (str), is_yours (bool), tdepth (int).
+    Truncates branches deeper than max_depth.
+    """
+    try:
+        import networkx as nx
+    except ImportError:
+        return None, None
+
+    G = nx.DiGraph()
+    nid = [0]
+
+    def add(label, is_yours, td):
+        n = nid[0]; nid[0] += 1
+        G.add_node(n, label=label, is_yours=is_yours, tdepth=td)
+        return n
+
+    stack: dict[int, int] = {}
+
+    if is_white:
+        # First non-branch line is the root your-move (e.g. "1.d4")
+        root = None
+        body_start = 0
+        for i, line in enumerate(lines):
+            s = line.strip()
+            if s and not any(c in s for c in ("├", "└", "│", "──")):
+                root = add(s, True, -1)
+                stack[-1] = root
+                body_start = i + 1
+                break
+        if root is None:
+            root = add("", False, -1)
+            stack[-1] = root
+            body_start = 0
+        remaining = lines[body_start:]
+    else:
+        root = add("", False, -1)
+        stack[-1] = root
+        remaining = lines
+
+    for line in remaining:
+        s = line.rstrip()
+        if not s.strip() or "──" in s or s.strip().startswith("###"):
+            continue
+        # Strip only the fixed 2-space file prefix so that space-based
+        # indentation (from └─ branches) is preserved for depth counting.
+        s_body = s[2:] if s.startswith("  ") else s
+        td = _rep_tree_depth(s_body)
+        if td > max_depth:
+            continue
+        content = re.sub(r"^[│ ]*[├└]─ ", "", s_body).strip()
+        if not content:
+            continue
+        if "→" in content:
+            opp_move, your_move = [p.strip() for p in content.split("→", 1)]
+        else:
+            opp_move, your_move = content, None
+
+        parent = stack.get(td - 1, root)
+        opp_id = add(opp_move, False, td)
+        G.add_edge(parent, opp_id)
+        if your_move:
+            your_id = add(your_move, True, td)
+            G.add_edge(opp_id, your_id)
+            stack[td] = your_id
+            for k in list(stack):
+                if k > td:
+                    del stack[k]
+        else:
+            stack[td] = opp_id
+            for k in list(stack):
+                if k > td:
+                    del stack[k]
+
+    return G, root
+
+
+def _rep_layout(G, root: int) -> tuple[dict[int, tuple[float, float]], int]:
+    """Leaf-proportional top-down layout.
+
+    Returns (pos, n_leaves_total) where each leaf occupies exactly 1 x-unit,
+    so the caller can size the figure accordingly.
+    """
+    memo: dict[int, int] = {}
+
+    def n_leaves(n: int) -> int:
+        if n in memo:
+            return memo[n]
+        ch = list(G.successors(n))
+        result = sum(n_leaves(c) for c in ch) if ch else 1
+        memo[n] = result
+        return result
+
+    total = n_leaves(root)
+    pos: dict[int, tuple[float, float]] = {}
+
+    def assign(n: int, left: float, right: float, depth: int) -> None:
+        pos[n] = ((left + right) / 2.0, -float(depth) * 1.5)
+        children = list(G.successors(n))
+        if not children:
+            return
+        counts = [n_leaves(c) for c in children]
+        s = sum(counts)
+        x = left
+        for c, cnt in zip(children, counts):
+            w = (cnt / s) * (right - left)
+            assign(c, x, x + w, depth + 1)
+            x += w
+
+    assign(root, 0.0, float(total), 0)
+    return pos, total
+
+
+def _draw_rep_tree(ax, G, root: int, pos: dict, n_leaves_total: int,
+                   method_color: str, title: str) -> None:
+    """Draw a parsed repertoire tree onto ax.
+
+    n_leaves_total is used to compute node dimensions so boxes never overlap.
+    """
+    from matplotlib.patches import FancyBboxPatch
+
+    if G is None or G.number_of_nodes() == 0:
+        ax.set_visible(False)
+        return
+
+    draw_nodes = [n for n in G.nodes if G.nodes[n]["label"]]
+    if not draw_nodes:
+        ax.set_visible(False)
+        return
+
+    # Node box: occupy ~85% of each leaf's x-slot, fixed height in data units
+    half_w = 0.42          # half-width in x data units (leaf slot = 1.0)
+    half_h = 0.45          # half-height in y data units (level gap = 1.5)
+
+    ys = [pos[n][1] for n in draw_nodes]
+    xs = [pos[n][0] for n in draw_nodes]
+    ax.set_xlim(min(xs) - 0.6, max(xs) + 0.6)
+    ax.set_ylim(min(ys) - 1.0, max(ys) + 1.0)
+    ax.axis("off")
+    ax.set_title(title, fontsize=9, fontweight="bold", pad=4)
+
+    # Edges
+    for u, v in G.edges():
+        if not G.nodes[u]["label"] or not G.nodes[v]["label"]:
+            continue
+        x0, y0 = pos[u]
+        x1, y1 = pos[v]
+        ax.annotate(
+            "",
+            xy=(x1, y1 + half_h), xytext=(x0, y0 - half_h),
+            arrowprops=dict(
+                arrowstyle="-|>", color="#bbbbbb",
+                lw=0.7, mutation_scale=5,
+            ),
+            annotation_clip=False,
+        )
+
+    # Nodes
+    for n in draw_nodes:
+        x, y = pos[n]
+        is_yours = G.nodes[n]["is_yours"]
+        label = G.nodes[n]["label"]
+
+        facecolor = method_color if is_yours else "#eeeeee"
+        edgecolor  = "#444444"   if is_yours else "#aaaaaa"
+        textcolor  = "white"     if is_yours else "#333333"
+
+        bbox = FancyBboxPatch(
+            (x - half_w, y - half_h), 2 * half_w, 2 * half_h,
+            boxstyle="round,pad=0.02",
+            facecolor=facecolor, edgecolor=edgecolor,
+            linewidth=0.7, alpha=0.9,
+            transform=ax.transData, clip_on=False,
+        )
+        ax.add_patch(bbox)
+        ax.text(
+            x, y, label,
+            ha="center", va="center",
+            fontsize=6, color=textcolor,
+            fontweight="bold" if is_yours else "normal",
+            clip_on=False,
+        )
+
+
+def _parse_rep_txt(txt_path: str) -> dict[str, dict[str, list[str]]]:
+    """Parse repertoire_tree.txt into {mode: {"white": lines, "black": lines}}."""
+    sections: dict[str, dict[str, list[str]]] = {}
+    current_mode: str | None = None
+    current_side: str | None = None  # "white" or "black"
+
+    with open(txt_path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.rstrip("\n")
+            # Mode header line
+            mode_m = re.search(r"MODE\s*:\s*(\w+)", line)
+            if mode_m:
+                current_mode = mode_m.group(1)
+                sections[current_mode] = {"white": [], "black": []}
+                current_side = None
+                continue
+            if current_mode is None:
+                continue
+            if "── AS WHITE ──" in line:
+                current_side = "white"
+                continue
+            if "── AS BLACK ──" in line:
+                current_side = "black"
+                continue
+            if current_side is not None:
+                sections[current_mode][current_side].append(line)
+
+    return sections
+
+
+def plot_repertoire_graphs(results_dir: str, max_depth: int = 2) -> None:
+    """Generate paper-ready 2D tree figures from repertoire_tree.txt.
+
+    Produces one PNG per method: repertoire_graph_{MODE}.png
+    Each figure has two panels: White repertoire (left) and Black repertoire (right).
+    """
+    try:
+        import networkx as nx  # noqa: F401
+    except ImportError:
+        print("  networkx not installed — skipping repertoire graphs.")
+        return
+
+    txt_path = os.path.join(results_dir, "repertoire_tree.txt")
+    if not os.path.exists(txt_path):
+        print(f"  {txt_path} not found — skipping repertoire graphs.")
+        return
+
+    sections = _parse_rep_txt(txt_path)
+
+    GA_MODES = ["COEVOLVE", "STATIC", "GREEDY_HILLCLIMB"]
+    SIDE_LABELS = {
+        "white": "As White",
+        "black": "As Black",
+    }
+
+    UNITS_PER_INCH = 1.8   # how many leaf-columns fit per inch of figure width
+    DEPTH_HEIGHT   = 2.0   # inches per depth level
+
+    for mode in GA_MODES:
+        if mode not in sections:
+            continue
+        color = _METHOD_COLORS.get(mode, "#333333")
+
+        # Parse both sides first so we can size the figure
+        parsed = {}
+        for side in ("white", "black"):
+            lines = sections[mode].get(side, [])
+            G, root = _parse_rep_section(lines, is_white=(side == "white"),
+                                         max_depth=max_depth)
+            if G is not None and root is not None:
+                pos, nleaves = _rep_layout(G, root)
+            else:
+                pos, nleaves = {}, 1
+            parsed[side] = (G, root, pos, nleaves)
+
+        # Figure width: proportional to max leaves across both panels
+        max_leaves = max(parsed["white"][3], parsed["black"][3])
+        fig_w = max(14, max_leaves / UNITS_PER_INCH * 2 + 1)
+
+        # Figure height: proportional to tree depth
+        max_depth_seen = max(
+            (max(G.nodes[n]["tdepth"] for n in G.nodes if G.nodes[n]["label"])
+             if G and G.number_of_nodes() > 0 else 0)
+            for G, *_ in parsed.values()
+        )
+        fig_h = max(5, (max_depth_seen + 2) * DEPTH_HEIGHT)
+
+        fig, axes = plt.subplots(1, 2, figsize=(fig_w, fig_h))
+
+        for ax, side in zip(axes, ("white", "black")):
+            G, root, pos, nleaves = parsed[side]
+            title = (f"{_METHOD_LABELS.get(mode, mode)} — {SIDE_LABELS[side]}"
+                     f"  (depth ≤ {max_depth})")
+            _draw_rep_tree(ax, G, root, pos, nleaves, color, title)
+
+        fig.suptitle(
+            f"Opening Repertoire — {_METHOD_LABELS.get(mode, mode)}\n"
+            f"■ Your moves   □ Opponent moves",
+            fontsize=11, y=1.01,
+        )
+        fig.tight_layout()
+        out = os.path.join(results_dir, f"repertoire_graph_{mode}.png")
+        fig.savefig(out, dpi=180, bbox_inches="tight")
+        plt.close(fig)
+        print(f"  saved -> {out}")
+
+
 def run_analysis(
     runs_dir: str = "runs",
     results_dir: str = "results",
@@ -1423,6 +1755,11 @@ def run_analysis(
     plot_coevolve_dynamics(runs, os.path.join(results_dir, "coevolve_dynamics.png"))
     print("  saved.")
 
+    print("\nComputing runtime_table.csv ...")
+    runtime_df = compute_runtime_table(runs)
+    runtime_df.to_csv(os.path.join(results_dir, "runtime_table.csv"), index=False)
+    print(runtime_df.to_string(index=False))
+
     print("\nComputing diagnostic_table.csv ...")
     diag_df = compute_diagnostic_table(runs)
     diag_df.to_csv(os.path.join(results_dir, "diagnostic_table.csv"), index=False)
@@ -1430,6 +1767,9 @@ def run_analysis(
 
     print("\nWriting repertoire_tree.txt + repertoire_grouped.txt ...")
     write_repertoire_report(runs, results_dir)
+
+    print("\nPlotting repertoire_graph_*.png ...")
+    plot_repertoire_graphs(results_dir)
 
     print(f"\nDone - results saved to '{results_dir}'.")
 

@@ -84,7 +84,7 @@ PRIOR_MAX_PLY = 10
 # positions.
 # Increase = bigger/more complete repertoire, harder search problem.
 # Decrease = simpler repertoire, easier to optimize.
-BUDGET = 10
+BUDGET = 12
 
 # Closure threshold: an opponent reply must be covered in the repertoire if
 # it appears in >= this fraction of games at a given position.
@@ -209,13 +209,13 @@ LAMBDA_WEIGHT = 1.0
 # Methods to compare: greedy baseline, static opponent, co-evolved.
 MAIN_METHODS  = ["most_played_baseline", "STATIC", "COEVOLVE"]
 MAIN_LAMBDA   = 1.0         # lambda used for all main runs
-MAIN_SEEDS    = list(range(1000, 1030))   # 15 seeds → 15 independent runs per method
+MAIN_SEEDS    = list(range(1000, 1001))   # 15 seeds → 15 independent runs per method
 
 # --- Non-GA baselines ---
 # Total evaluation budget = POP_SIZE_REPERTOIRES × N_GENERATIONS (same as the GA).
 # This ensures fair comparison: baselines get the same number of fitness calls.
 BASELINE_METHODS = ["RANDOM_SEARCH", "GREEDY_HILLCLIMB"]
-BASELINE_SEEDS   = list(range(1000, 1030))
+BASELINE_SEEDS   = list(range(1000, 1001))
 GA_EVAL_BUDGET   = POP_SIZE_REPERTOIRES * N_GENERATIONS  # = 6000
 
 # --- Closure-constraint ablation ---
@@ -224,4 +224,4 @@ GA_EVAL_BUDGET   = POP_SIZE_REPERTOIRES * N_GENERATIONS  # = 6000
 # using the same seeds so results are paired (same random initialisation).
 # 2 methods × 15 seeds = 30 new runs.
 CLOSURE_ABLATION_METHODS = ["STATIC_NOCLOSURE", "COEVOLVE_NOCLOSURE"]
-CLOSURE_ABLATION_SEEDS   = list(range(1000, 1030))   # same 15 seeds as ma
+CLOSURE_ABLATION_SEEDS   = list(range(1000, 1001))   # same 15 seeds as ma

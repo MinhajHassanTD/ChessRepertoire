@@ -1,0 +1,427 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chess Repertoire — Sankey Flow</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-sankey/0.12.3/d3-sankey.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1115; color: #e8e6df; font-family: 'Courier New', monospace; }
+  #app { padding: 24px 28px 40px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 16px; font-weight: normal; letter-spacing: 2px; text-transform: uppercase; color: #888; margin-bottom: 20px; border-bottom: 1px solid #2a2d35; padding-bottom: 12px; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+  .ctrl-group { display: flex; gap: 0; border: 1px solid #2a2d35; border-radius: 5px; overflow: hidden; }
+  button {
+    padding: 7px 16px; font-size: 12px; font-family: 'Courier New', monospace;
+    background: transparent; border: none; color: #888; cursor: pointer; transition: all .12s;
+    letter-spacing: .5px;
+  }
+  button:hover { background: #1e2128; color: #ccc; }
+  button.active { background: #2a7a3b; color: #b6efc2; }
+  button.active-b { background: #1a3f6f; color: #9ec5f7; }
+  .sep { width: 1px; background: #2a2d35; }
+  #canvas { width: 100%; }
+  .node-label { font-size: 11px; font-family: 'Courier New', monospace; fill: #ccc; }
+  .node-label.you { fill: #7fd4a0; font-weight: bold; }
+  .node-label.opp { fill: #8ab4d4; }
+  .node-label.root { fill: #fff; font-size: 13px; font-weight: bold; }
+  .link { fill: none; }
+  .node rect { stroke: none; }
+  .tooltip {
+    position: fixed; background: #1e2128; border: 1px solid #3a3d48;
+    border-radius: 5px; padding: 8px 12px; font-size: 12px;
+    pointer-events: none; opacity: 0; transition: opacity .15s;
+    color: #e0ddd6; max-width: 240px; line-height: 1.5; z-index: 99;
+  }
+  .legend { display: flex; gap: 20px; flex-wrap: wrap; font-size: 11px; color: #666; margin-top: 16px; letter-spacing: .5px; }
+  .leg { display: flex; align-items: center; gap: 7px; }
+  .leg-box { width: 18px; height: 4px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Chess Repertoire — Opening Flow</h1>
+  <div class="controls">
+    <div class="ctrl-group">
+      <button id="btn-coevolve" class="active" onclick="setMode('coevolve')">Coevolve</button>
+      <div class="sep"></div>
+      <button id="btn-static" onclick="setMode('static')">Static</button>
+      <div class="sep"></div>
+      <button id="btn-greedy" onclick="setMode('greedy')">Greedy hillclimb</button>
+    </div>
+    <div class="ctrl-group">
+      <button id="btn-white" class="active" onclick="setSide('white')">As White</button>
+      <div class="sep"></div>
+      <button id="btn-black" onclick="setSide('black')">As Black</button>
+    </div>
+    <button onclick="loadData()" style="padding:7px 14px;font-size:11px;font-family:'Courier New',monospace;background:transparent;border:1px solid #2a2d35;border-radius:5px;color:#888;cursor:pointer;" title="Load repertoire_tree.txt">Load .txt</button>
+  </div>
+  <svg id="canvas"></svg>
+  <div class="legend">
+    <div class="leg"><div class="leg-box" style="background:#3a9b55"></div><span>Your committed reply</span></div>
+    <div class="leg"><div class="leg-box" style="background:#4a7fa8"></div><span>Opponent's variation</span></div>
+    <div class="leg"><div class="leg-box" style="background:#8a7a3a"></div><span>Uncommitted / leaf</span></div>
+  </div>
+</div>
+<div class="tooltip" id="tip"></div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+// Each tree is a nested structure: {m: move, r: reply, ch: [...children]}
+// "m" = opponent move, "r" = your reply, "ch" = continuations
+
+// ── Parser (dynamic load) ─────────────────────────────────────────────────────
+let TREES = {};
+
+function parseRepertoireTxt(text) {
+  const out = {coevolve:{white:[],black:[]}, static:{white:[],black:[]}, greedy:{white:[],black:[]}};
+  const modeMap = {COEVOLVE:'coevolve', STATIC:'static', GREEDY_HILLCLIMB:'greedy'};
+  let mode = null, side = null, buf = [];
+  function flush() { if (mode && side && buf.length) out[mode][side] = parseSectionLines(buf); buf = []; }
+  for (const line of text.split('\n')) {
+    const mm = line.match(/MODE\s*:\s*(\w+)/);
+    if (mm) { flush(); mode = modeMap[mm[1]] || null; side = null; continue; }
+    if (line.includes('── AS WHITE ──')) { flush(); side = 'white'; continue; }
+    if (line.includes('── AS BLACK ──')) { flush(); side = 'black'; continue; }
+    if (/[├└]─/.test(line)) buf.push(line);
+  }
+  flush();
+  return out;
+}
+function parseSectionLines(lines) {
+  const items = [];
+  for (const line of lines) {
+    const ci = line.search(/[├└]─/);
+    if (ci < 0) continue;
+    const depth = Math.max(0, Math.round((ci - 2) / 3));
+    const content = line.slice(ci + 2).trim();
+    const ai = content.indexOf('  →  ');
+    const opp   = ai >= 0 ? content.slice(0, ai).trim() : content.trim();
+    const reply = ai >= 0 ? content.slice(ai + 5).trim() : null;
+    if (opp) items.push({depth, opp, reply});
+  }
+  const roots = [], stack = [];
+  for (const {depth, opp, reply} of items) {
+    const node = reply ? {m:opp, r:reply} : {m:opp};
+    if (depth === 0) roots.push(node);
+    else { const p = stack[depth-1]; if (p) { if (!p.ch) p.ch=[]; p.ch.push(node); } }
+    stack[depth] = node; stack.length = depth + 1;
+  }
+  return roots;
+}
+async function loadData() {
+  try {
+    const resp = await fetch('../results/repertoire_tree.txt');
+    if (!resp.ok) throw new Error('not ok');
+    TREES = parseRepertoireTxt(await resp.text());
+  } catch {
+    await new Promise(res => {
+      const inp = document.createElement('input');
+      inp.type='file'; inp.accept='.txt';
+      inp.onchange = async () => { TREES = parseRepertoireTxt(await inp.files[0].text()); res(); };
+      document.body.appendChild(inp); inp.click(); document.body.removeChild(inp);
+    });
+  }
+  render();
+}
+// ── State ─────────────────────────────────────────────────────────────────────
+let curMode = 'coevolve', curSide = 'white';
+
+function setMode(m) {
+  curMode = m;
+  ['coevolve','static','greedy'].forEach(x => {
+    document.getElementById('btn-'+x).className = x===m ? 'active' : '';
+  });
+  render();
+}
+function setSide(s) {
+  curSide = s;
+  document.getElementById('btn-white').className = s==='white' ? 'active' : '';
+  document.getElementById('btn-black').className = s==='black' ? 'active-b' : '';
+  render();
+}
+
+// ── Convert tree → Sankey nodes+links ─────────────────────────────────────────
+function treeToSankey(roots, side) {
+  const nodes = [], links = [];
+  const nodeMap = {};
+  let idx = 0;
+
+  function getId(label, depth, parentId) {
+    // Use unique key including parent to allow same move at diff depths
+    const key = `${parentId}__${depth}__${label}`;
+    if (!(key in nodeMap)) {
+      nodeMap[key] = idx++;
+      nodes.push({ id: nodeMap[key], label, depth, key });
+    }
+    return nodeMap[key];
+  }
+
+  // Root node
+  const rootLabel = side === 'white' ? '1.d4' : 'Start';
+  const rootId = getId(rootLabel, 0, 'ROOT');
+  nodes[rootId].isRoot = true;
+
+  function walk(nodeList, parentId, depth) {
+    nodeList.forEach(n => {
+      // Opponent move node
+      const oppId = getId(n.m, depth, parentId);
+      nodes[oppId].isOpp = true;
+      links.push({ source: parentId, target: oppId, value: 1 });
+
+      if (n.r) {
+        // Your reply node
+        const youId = getId(n.r, depth + 0.5, oppId);
+        nodes[youId].isYou = true;
+        links.push({ source: oppId, target: youId, value: 1 });
+
+        if (n.ch && n.ch.length) {
+          walk(n.ch, youId, depth + 1);
+        }
+      } else if (n.ch && n.ch.length) {
+        walk(n.ch, oppId, depth + 1);
+      }
+    });
+  }
+
+  walk(roots, rootId, 1);
+  return { nodes, links };
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  const svg = d3.select('#canvas');
+  svg.selectAll('*').remove();
+
+  const roots = TREES[curMode][curSide];
+  const { nodes, links } = treeToSankey(roots, curSide);
+
+  const W = document.getElementById('canvas').clientWidth || 1100;
+  const H = Math.max(600, nodes.length * 14);
+  svg.attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+
+  // Assign depths by label prefix number
+  // Build depth map properly
+  nodes.forEach(n => {
+    if (n.isRoot) n.sankeyDepth = 0;
+    else {
+      // Count dots/number prefix
+      const m = n.label.match(/^(\d+)/);
+      if (m) {
+        const num = parseInt(m[1]);
+        n.sankeyDepth = (num - 1) * 2 + (n.label.includes('...') ? 1 : 0) + (n.isYou ? 0.5 : 0);
+      } else {
+        n.sankeyDepth = n.depth;
+      }
+    }
+  });
+
+  // Group nodes by integer depth level for layout
+  const depthBuckets = {};
+  nodes.forEach(n => {
+    const d = Math.round(n.depth * 2);
+    if (!depthBuckets[d]) depthBuckets[d] = [];
+    depthBuckets[d].push(n);
+  });
+
+  const maxDepth = Math.max(...nodes.map(n => Math.round(n.depth * 2)));
+  const PAD_L = 10, PAD_R = 180, PAD_T = 30, PAD_B = 30;
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_T - PAD_B;
+
+  // Use d3-sankey
+  const sankeyGen = d3.sankey()
+    .nodeId(d => d.id)
+    .nodeWidth(6)
+    .nodePadding(4)
+    .extent([[PAD_L, PAD_T], [W - PAD_R, H - PAD_B]])
+    .nodeAlign(d3.sankeyLeft);
+
+  // Build proper sankey data
+  const sankeyData = sankeyGen({
+    nodes: nodes.map(d => Object.assign({}, d)),
+    links: links.map(d => Object.assign({}, d))
+  });
+
+  const g = svg.append('g');
+
+  // Color scale per top-level branch
+  const topBranches = roots.map((r, i) => r.m);
+  const palette = [
+    ['#1a6b2e','#2d9e4a','#6fcf8a','#a8e6b8'],  // green family
+    ['#4a3800','#8a6b10','#c4a030','#e8cf80'],  // amber family
+    ['#1a2e5a','#2d5a9e','#5a8fd4','#9abee8'],  // blue family
+    ['#4a1a30','#8a3060','#c460a0','#e8a0c8'],  // pink family
+  ];
+
+  // Map each link to a color based on its ultimate top-level ancestor
+  // We'll trace back through the graph
+  const linkAncestor = new Map();
+
+  function findAncestor(nodeId, visited = new Set()) {
+    if (visited.has(nodeId)) return null;
+    visited.add(nodeId);
+    const node = sankeyData.nodes.find(n => n.id === nodeId);
+    if (!node) return null;
+    if (node.isRoot) return null;
+    // Check incoming links
+    for (const lnk of sankeyData.links) {
+      if (lnk.target.id === nodeId) {
+        const src = lnk.source;
+        if (src.isRoot) {
+          // This link's target is direct child of root
+          const childIdx = sankeyData.links
+            .filter(l => l.source.id === src.id)
+            .findIndex(l => l.target.id === nodeId);
+          return childIdx;
+        }
+        return findAncestor(src.id, visited);
+      }
+    }
+    return null;
+  }
+
+  // Color links
+  sankeyData.links.forEach(lnk => {
+    const srcNode = lnk.source;
+    if (srcNode.isRoot) {
+      const idx = sankeyData.links
+        .filter(l => l.source.id === srcNode.id)
+        .indexOf(lnk);
+      lnk.branchIdx = idx;
+    } else {
+      // propagate from source
+      lnk.branchIdx = lnk.source.branchIdx !== undefined ? lnk.source.branchIdx : 0;
+    }
+  });
+
+  // propagate branchIdx through nodes and links properly
+  function propagate() {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      sankeyData.links.forEach(lnk => {
+        if (lnk.branchIdx === undefined) {
+          if (lnk.source.branchIdx !== undefined) {
+            lnk.branchIdx = lnk.source.branchIdx;
+            changed = true;
+          }
+        }
+        if (lnk.target.branchIdx === undefined && lnk.branchIdx !== undefined) {
+          lnk.target.branchIdx = lnk.branchIdx;
+          changed = true;
+        }
+      });
+    }
+  }
+
+  // First pass: assign root's children
+  sankeyData.nodes.find(n => n.isRoot).branchIdx = -1;
+  let rootChildIdx = 0;
+  sankeyData.links.forEach(lnk => {
+    if (lnk.source.isRoot) {
+      lnk.branchIdx = rootChildIdx;
+      lnk.target.branchIdx = rootChildIdx;
+      rootChildIdx++;
+    }
+  });
+  propagate();
+
+  function getBranchColor(branchIdx, nodeType) {
+    const fam = palette[branchIdx % palette.length] || palette[0];
+    if (nodeType === 'you') return fam[1];
+    if (nodeType === 'opp') return fam[2];
+    return fam[2];
+  }
+
+  // Draw links
+  const linkPath = d3.sankeyLinkHorizontal();
+
+  g.append('g').selectAll('path')
+    .data(sankeyData.links)
+    .join('path')
+    .attr('class', 'link')
+    .attr('d', linkPath)
+    .attr('stroke-width', d => Math.max(1, d.width))
+    .attr('stroke', d => {
+      const bi = d.branchIdx !== undefined ? d.branchIdx : 0;
+      const fam = palette[bi % palette.length] || palette[0];
+      const tgt = d.target;
+      if (tgt.isYou) return fam[1];
+      if (tgt.isOpp) return fam[2];
+      return fam[2];
+    })
+    .attr('opacity', 0.55)
+    .on('mouseover', function(event, d) {
+      d3.select(this).attr('opacity', 0.85);
+      showTip(event, `${d.source.label} → ${d.target.label}`);
+    })
+    .on('mousemove', moveTip)
+    .on('mouseout', function() {
+      d3.select(this).attr('opacity', 0.55);
+      hideTip();
+    });
+
+  // Draw nodes
+  const nodeG = g.append('g').selectAll('g')
+    .data(sankeyData.nodes)
+    .join('g')
+    .attr('class', 'node')
+    .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+  nodeG.append('rect')
+    .attr('height', d => Math.max(1, d.y1 - d.y0))
+    .attr('width', d => d.x1 - d.x0)
+    .attr('fill', d => {
+      const bi = d.branchIdx !== undefined ? d.branchIdx : 0;
+      const fam = palette[bi % palette.length] || palette[0];
+      if (d.isRoot) return '#ffffff';
+      if (d.isYou) return fam[0];
+      if (d.isOpp) return fam[1];
+      return fam[2];
+    })
+    .attr('opacity', 0.9);
+
+  // Labels on right side (for nodes on the right) and left (for root)
+  nodeG.append('text')
+    .attr('class', d => d.isRoot ? 'node-label root' : d.isYou ? 'node-label you' : 'node-label opp')
+    .attr('x', d => d.x1 - d.x0 + 6)
+    .attr('y', d => (d.y1 - d.y0) / 2)
+    .attr('dy', '0.35em')
+    .attr('text-anchor', 'start')
+    .text(d => d.label)
+    .attr('display', d => {
+      const h = d.y1 - d.y0;
+      // Only show label if node is tall enough or it's near the right edge
+      return h >= 7 || d.x1 > (W - PAD_R - 100) ? null : 'none';
+    });
+
+  // Tooltip
+  nodeG.on('mouseover', function(event, d) {
+    const bi = d.branchIdx !== undefined ? d.branchIdx : 0;
+    const typeStr = d.isRoot ? 'Opening move' : d.isYou ? 'Your reply' : 'Opponent variation';
+    showTip(event, `<strong>${d.label}</strong><br>${typeStr}`);
+  })
+  .on('mousemove', moveTip)
+  .on('mouseout', hideTip);
+}
+
+const tip = document.getElementById('tip');
+function showTip(event, html) {
+  tip.innerHTML = html;
+  tip.style.opacity = 1;
+  moveTip(event);
+}
+function moveTip(event) {
+  tip.style.left = (event.clientX + 14) + 'px';
+  tip.style.top = (event.clientY - 10) + 'px';
+}
+function hideTip() { tip.style.opacity = 0; }
+
+// Initial render
+window.addEventListener('resize', render);
+loadData();
+</script>
+</body>
+</html>

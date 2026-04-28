@@ -1,0 +1,5 @@
+metric,method_with,method_without,mean_with,mean_without,delta,wilcoxon_p,A12,significant_p05
+heldout_uniform_mean,STATIC,STATIC_NOCLOSURE,,,,,,False
+heldout_uniform_mean,COEVOLVE,COEVOLVE_NOCLOSURE,,,,,,False
+heldout_worst_band,STATIC,STATIC_NOCLOSURE,,,,,,False
+heldout_worst_band,COEVOLVE,COEVOLVE_NOCLOSURE,,,,,,False

@@ -84,7 +84,7 @@ PRIOR_MAX_PLY = 10
 # positions.
 # Increase = bigger/more complete repertoire, harder search problem.
 # Decrease = simpler repertoire, easier to optimize.
-BUDGET = 10
+BUDGET = 25
 
 # Closure threshold: an opponent reply must be covered in the repertoire if
 # it appears in >= this fraction of games at a given position.

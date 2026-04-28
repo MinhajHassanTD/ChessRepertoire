@@ -1,0 +1,1021 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Repertoire Simulator</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0d0f14;
+  --bg2: #13161e;
+  --bg3: #1a1e28;
+  --bg4: #222636;
+  --border: #2a2f3f;
+  --border2: #363d54;
+  --text: #e2e0d8;
+  --text2: #9a97a0;
+  --text3: #5a5870;
+  --green: #3dbe6c;
+  --green-dim: #1e6038;
+  --green-bg: #0d2018;
+  --blue: #4a9eff;
+  --blue-dim: #1e4080;
+  --blue-bg: #0a1628;
+  --amber: #f0b030;
+  --amber-dim: #7a5810;
+  --red: #e05050;
+  --sq-light: #f0d9b5;
+  --sq-dark: #b58863;
+  --sq-light-hl: #cdd16f;
+  --sq-dark-hl: #aaa23a;
+  --sq-light-hint: #cce8cc;
+  --sq-dark-hint: #7ab07a;
+  --sq-light-last: #cce0ff;
+  --sq-dark-last: #7aaadd;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top bar ── */
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.topbar h1 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.topbar-sep { width: 1px; height: 24px; background: var(--border); }
+.btn-group { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.btn {
+  padding: 5px 13px;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all .12s;
+  letter-spacing: .3px;
+}
+.btn:last-child { border-right: none; }
+.btn:hover { background: var(--bg3); color: var(--text); }
+.btn.on-white { background: #2a3020; color: var(--green); }
+.btn.on-black { background: #101828; color: var(--blue); }
+
+/* ── Main layout ── */
+.main {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Left: scenario tree ── */
+.sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-head {
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--text3);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.scenario-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.scenario-list::-webkit-scrollbar { width: 4px; }
+.scenario-list::-webkit-scrollbar-track { background: transparent; }
+.scenario-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.scenario-item {
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background .1s;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-left: 2px solid transparent;
+}
+.scenario-item:hover { background: var(--bg3); }
+.scenario-item.active {
+  background: var(--bg3);
+  border-left-color: var(--green);
+}
+.scenario-item.active-black { border-left-color: var(--blue); }
+
+.sc-moves {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.sc-moves .you { color: var(--green); }
+.sc-moves .opp { color: var(--text2); }
+.sc-meta { font-size: 10px; color: var(--text3); }
+
+/* ── Center: board ── */
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.board-wrap { position: relative; }
+
+.board-container {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  grid-template-rows: 1fr 20px;
+  gap: 0;
+}
+.rank-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  padding: 2px 0;
+}
+.rank-labels span, .file-labels span {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  text-align: center;
+  line-height: 1;
+}
+.file-labels {
+  display: flex;
+  justify-content: space-around;
+  grid-column: 2;
+  padding: 0 2px;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  border: 2px solid var(--border2);
+}
+
+.sq {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  font-size: 40px;
+  line-height: 1;
+  user-select: none;
+  transition: background .1s;
+}
+.sq.light { background: var(--sq-light); }
+.sq.dark  { background: var(--sq-dark); }
+.sq.hl-light { background: var(--sq-light-hl); }
+.sq.hl-dark  { background: var(--sq-dark-hl); }
+.sq.last-light { background: var(--sq-light-last); }
+.sq.last-dark  { background: var(--sq-dark-last); }
+.sq.hint-light { background: var(--sq-light-hint); }
+.sq.hint-dark  { background: var(--sq-dark-hint); }
+.sq .dot {
+  position: absolute;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.18);
+  pointer-events: none;
+}
+.sq .ring {
+  position: absolute;
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  border: 4px solid rgba(0,0,0,0.18);
+  pointer-events: none;
+}
+
+/* ── Move controls ── */
+.move-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ctrl-btn {
+  width: 32px; height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg2);
+  color: var(--text2);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .1s;
+}
+.ctrl-btn:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+.ctrl-btn:disabled { opacity: .3; cursor: default; }
+.move-counter {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text3);
+  min-width: 60px;
+  text-align: center;
+}
+
+/* ── Right: move log + info ── */
+.rightpanel {
+  width: 240px;
+  min-width: 240px;
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-head {
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--text3);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.move-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.move-log::-webkit-scrollbar { width: 4px; }
+.move-log::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.move-row {
+  display: flex;
+  align-items: stretch;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+}
+.move-num {
+  width: 30px;
+  padding: 3px 6px 3px 14px;
+  color: var(--text3);
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.move-cell {
+  flex: 1;
+  padding: 3px 6px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background .1s;
+}
+.move-cell:hover { background: var(--bg3); }
+.move-cell.active-move {
+  background: var(--bg4);
+  color: var(--amber);
+}
+.move-cell.you-move { color: var(--green); }
+.move-cell.opp-move { color: var(--text2); }
+
+.info-section {
+  border-top: 1px solid var(--border);
+  padding: 12px 14px;
+  flex-shrink: 0;
+}
+.info-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.next-move-hint {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: var(--green);
+  line-height: 1.5;
+}
+.hint-label { font-size: 10px; color: var(--text3); margin-bottom: 2px; }
+.status-pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500;
+  letter-spacing: .5px;
+  margin-top: 8px;
+}
+.pill-complete { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-dim); }
+.pill-playing  { background: var(--blue-bg);  color: var(--blue);  border: 1px solid var(--blue-dim); }
+.pill-you      { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-dim); }
+.pill-opp      { background: #1a1208; color: var(--amber); border: 1px solid var(--amber-dim); }
+
+/* ── Auto-play ── */
+.auto-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .12s;
+}
+.auto-btn:hover { background: var(--bg3); color: var(--text); }
+.auto-btn.playing { background: var(--green-bg); color: var(--green); border-color: var(--green-dim); }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div class="topbar">
+  <h1>♟ REPERTOIRE SIMULATOR</h1>
+  <div class="topbar-sep"></div>
+  <div class="btn-group" id="modeGroup">
+    <button class="btn on-white" id="btn-coevolve" onclick="setMode('coevolve')">COEVOLVE</button>
+    <button class="btn" id="btn-static" onclick="setMode('static')">STATIC</button>
+    <button class="btn" id="btn-greedy" onclick="setMode('greedy')">GREEDY</button>
+  </div>
+  <div class="topbar-sep"></div>
+  <div class="btn-group">
+    <button class="btn on-white" id="btn-white" onclick="setSide('white')">AS WHITE</button>
+    <button class="btn" id="btn-black" onclick="setSide('black')">AS BLACK</button>
+  </div>
+  <div class="topbar-sep"></div>
+  <button class="btn" onclick="loadData()" title="Load repertoire_tree.txt">LOAD .TXT</button>
+</div>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- Scenarios -->
+  <div class="sidebar">
+    <div class="sidebar-head">Scenarios</div>
+    <div class="scenario-list" id="scenarioList"></div>
+  </div>
+
+  <!-- Board -->
+  <div class="center">
+    <div class="board-container">
+      <div class="rank-labels" id="rankLabels"></div>
+      <div id="board"></div>
+      <div></div><!-- spacer -->
+      <div class="file-labels" id="fileLabels"></div>
+    </div>
+    <div class="move-controls">
+      <button class="ctrl-btn" id="btnFirst" onclick="gotoMove(0)" title="First">⏮</button>
+      <button class="ctrl-btn" id="btnPrev"  onclick="stepMove(-1)" title="Back">◀</button>
+      <div class="move-counter" id="moveCounter">— / —</div>
+      <button class="ctrl-btn" id="btnNext"  onclick="stepMove(1)" title="Forward">▶</button>
+      <button class="ctrl-btn" id="btnLast"  onclick="gotoMove(9999)" title="Last">⏭</button>
+      <button class="auto-btn" id="autoBtn" onclick="toggleAuto()">▶ AUTO</button>
+    </div>
+  </div>
+
+  <!-- Move log -->
+  <div class="rightpanel">
+    <div class="panel-head">Move Log</div>
+    <div class="move-log" id="moveLog"></div>
+    <div class="info-section">
+      <div class="info-label">Status</div>
+      <div id="statusPill"></div>
+      <div style="margin-top:10px">
+        <div class="hint-label" id="hintLabel"></div>
+        <div class="next-move-hint" id="nextHint"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// PIECE UNICODE
+// ════════════════════════════════════════════════════════════════════
+const PIECES = {
+  wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
+  bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟'
+};
+
+// ════════════════════════════════════════════════════════════════════
+// REPERTOIRE DATA  (m=opponent move, r=your reply, ch=children)
+// ════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+// REPERTOIRE DATA — loaded dynamically from ../results/repertoire_tree.txt
+// ════════════════════════════════════════════════════════════════════
+let REPERTOIRE = {};
+
+function parseRepertoireTxt(text) {
+  const out = {coevolve:{white:[],black:[]}, static:{white:[],black:[]}, greedy:{white:[],black:[]}};
+  const modeMap = {COEVOLVE:'coevolve', STATIC:'static', GREEDY_HILLCLIMB:'greedy'};
+  let mode = null, side = null, buf = [];
+  function flush() { if (mode && side && buf.length) out[mode][side] = parseSectionLines(buf); buf = []; }
+  for (const line of text.split('\n')) {
+    const mm = line.match(/MODE\s*:\s*(\w+)/);
+    if (mm) { flush(); mode = modeMap[mm[1]] || null; side = null; continue; }
+    if (line.includes('── AS WHITE ──')) { flush(); side = 'white'; continue; }
+    if (line.includes('── AS BLACK ──')) { flush(); side = 'black'; continue; }
+    if (/[├└]─/.test(line)) buf.push(line);
+  }
+  flush();
+  return out;
+}
+function parseSectionLines(lines) {
+  const items = [];
+  for (const line of lines) {
+    const ci = line.search(/[├└]─/);
+    if (ci < 0) continue;
+    const depth = Math.max(0, Math.round((ci - 2) / 3));
+    const content = line.slice(ci + 2).trim();
+    const ai = content.indexOf('  →  ');
+    const opp   = ai >= 0 ? content.slice(0, ai).trim() : content.trim();
+    const reply = ai >= 0 ? content.slice(ai + 5).trim() : null;
+    if (opp) items.push({depth, opp, reply});
+  }
+  const roots = [], stack = [];
+  for (const {depth, opp, reply} of items) {
+    const node = reply ? {m:opp, r:reply} : {m:opp};
+    if (depth === 0) roots.push(node);
+    else { const p = stack[depth-1]; if (p) { if (!p.ch) p.ch=[]; p.ch.push(node); } }
+    stack[depth] = node; stack.length = depth + 1;
+  }
+  return roots;
+}
+async function loadData() {
+  try {
+    const resp = await fetch('../results/repertoire_tree.txt');
+    if (!resp.ok) throw new Error('not ok');
+    REPERTOIRE = parseRepertoireTxt(await resp.text());
+  } catch {
+    await new Promise(res => {
+      const inp = document.createElement('input');
+      inp.type='file'; inp.accept='.txt';
+      inp.onchange = async () => { REPERTOIRE = parseRepertoireTxt(await inp.files[0].text()); res(); };
+      document.body.appendChild(inp); inp.click(); document.body.removeChild(inp);
+    });
+  }
+  reload();
+}
+// ════════════════════════════════════════════════════════════════════
+// MOVE PARSER — converts algebraic to from/to squares
+// ════════════════════════════════════════════════════════════════════
+// We use a simplified board state tracker
+function initBoard() {
+  return {
+    // board[sq] = piece string like 'wP', 'bN', null
+    // sq = 'a1'..'h8'
+    squares: {},
+    turn: 'w',
+    castling: {wK:true,wQ:true,bK:true,bQ:true},
+    enPassant: null,
+    halfmove: 0, fullmove: 1
+  };
+}
+
+function setupStartPos(board) {
+  const b = board.squares;
+  const files = 'abcdefgh';
+  // Pawns
+  for(const f of files){ b[f+'2']='wP'; b[f+'7']='bP'; }
+  // White pieces
+  b['a1']='wR';b['b1']='wN';b['c1']='wB';b['d1']='wQ';b['e1']='wK';b['f1']='wB';b['g1']='wN';b['h1']='wR';
+  // Black pieces
+  b['a8']='bR';b['b8']='bN';b['c8']='bB';b['d8']='bQ';b['e8']='bK';b['f8']='bB';b['g8']='bN';b['h8']='bR';
+}
+
+function cloneBoard(board) {
+  return {
+    squares: {...board.squares},
+    turn: board.turn,
+    castling: {...board.castling},
+    enPassant: board.enPassant,
+    halfmove: board.halfmove,
+    fullmove: board.fullmove
+  };
+}
+
+function fileIdx(f){ return 'abcdefgh'.indexOf(f); }
+function rankIdx(r){ return parseInt(r)-1; }
+function sqName(fi,ri){ return 'abcdefgh'[fi]+(ri+1); }
+
+// Apply a move in standard algebraic notation to board state
+// Returns {from, to, board} or null
+function applyMove(board, san, movingColor) {
+  // Strip move number prefix like "1.", "1...", "2."
+  san = san.replace(/^\d+\.+\s*/, '').trim();
+  san = san.replace(/[+#!?]/g,'');
+
+  const b = board.squares;
+  const c = movingColor; // 'w' or 'b'
+  const opp = c==='w'?'b':'w';
+
+  // Castling
+  if (san==='O-O' || san==='0-0') {
+    const rank = c==='w'?'1':'8';
+    const from='e'+rank, to='g'+rank;
+    const newB = cloneBoard(board);
+    newB.squares['g'+rank]=newB.squares['e'+rank];
+    newB.squares['h'+rank]=undefined;
+    newB.squares['f'+rank]=''+c+'R';
+    newB.squares['e'+rank]=undefined;
+    newB.turn=opp; newB.castling[c+'K']=false; newB.castling[c+'Q']=false;
+    return {from,to,board:newB};
+  }
+  if (san==='O-O-O' || san==='0-0-0') {
+    const rank = c==='w'?'1':'8';
+    const from='e'+rank, to='c'+rank;
+    const newB = cloneBoard(board);
+    newB.squares['c'+rank]=newB.squares['e'+rank];
+    newB.squares['a'+rank]=undefined;
+    newB.squares['d'+rank]=''+c+'R';
+    newB.squares['e'+rank]=undefined;
+    newB.turn=opp; newB.castling[c+'K']=false; newB.castling[c+'Q']=false;
+    return {from,to,board:newB};
+  }
+
+  // Promotion: e8=Q etc.
+  let promotePiece = null;
+  const promMatch = san.match(/=([QRBN])$/);
+  if(promMatch){ promotePiece=c+promMatch[1]; san=san.replace(/=.*$/,''); }
+
+  // Determine piece type
+  const pieceMap = {N:'N',B:'B',R:'R',Q:'Q',K:'K'};
+  let pieceType = 'P';
+  let rest = san;
+  if(san[0]===san[0].toUpperCase() && pieceMap[san[0]]){
+    pieceType=san[0]; rest=san.slice(1);
+  }
+
+  // Capture flag
+  const isCapture = rest.includes('x');
+  rest = rest.replace('x','');
+
+  // Target square is last 2 chars
+  const toSq = rest.slice(-2);
+  const disambig = rest.slice(0,-2);
+
+  // Find piece that can make this move
+  const piece = c+pieceType;
+  let fromSq = null;
+
+  for(const sq in b){
+    if(b[sq]!==piece) continue;
+    // Check disambiguation
+    if(disambig){
+      if(disambig.length===2){ if(sq!==disambig) continue; }
+      else if(disambig.match(/[a-h]/)){ if(sq[0]!==disambig[0]) continue; }
+      else if(disambig.match(/[1-8]/)){ if(sq[1]!==disambig) continue; }
+    }
+    if(canReach(board, sq, toSq, piece, isCapture)){
+      fromSq=sq; break;
+    }
+  }
+
+  if(!fromSq) return null;
+
+  const newB = cloneBoard(board);
+  // En passant capture
+  if(pieceType==='P' && isCapture && !b[toSq] && board.enPassant===toSq){
+    const epRank = c==='w'?parseInt(toSq[1])-1:parseInt(toSq[1])+1;
+    newB.squares[toSq[0]+''+epRank]=undefined;
+  }
+  newB.squares[toSq] = promotePiece || piece;
+  newB.squares[fromSq] = undefined;
+  // En passant flag
+  newB.enPassant=null;
+  if(pieceType==='P' && Math.abs(parseInt(toSq[1])-parseInt(fromSq[1]))===2){
+    newB.enPassant=toSq[0]+(c==='w'?'3':'6');
+  }
+  // Castling rights
+  if(piece==='wK'){ newB.castling.wK=false; newB.castling.wQ=false; }
+  if(piece==='bK'){ newB.castling.bK=false; newB.castling.bQ=false; }
+  if(fromSq==='a1'||toSq==='a1') newB.castling.wQ=false;
+  if(fromSq==='h1'||toSq==='h1') newB.castling.wK=false;
+  if(fromSq==='a8'||toSq==='a8') newB.castling.bQ=false;
+  if(fromSq==='h8'||toSq==='h8') newB.castling.bK=false;
+
+  newB.turn=opp;
+  if(c==='b') newB.fullmove++;
+  return {from:fromSq, to:toSq, board:newB};
+}
+
+function canReach(board, from, to, piece, isCapture){
+  const b = board.squares;
+  const fi=fileIdx(from[0]), ri=rankIdx(from[1]);
+  const ft=fileIdx(to[0]),   rt=rankIdx(to[1]);
+  const df=ft-fi, dr=rt-ri;
+  const c=piece[0]; const opp=c==='w'?'b':'w';
+  const pt=piece[1];
+
+  // Target must not have own piece
+  if(b[to] && b[to][0]===c) return false;
+
+  if(pt==='P'){
+    const dir=c==='w'?1:-1;
+    const startRank=c==='w'?1:6;
+    if(isCapture){
+      return dr===dir && Math.abs(df)===1 && (b[to] || board.enPassant===to);
+    } else {
+      if(df!==0) return false;
+      if(dr===dir && !b[to]) return true;
+      if(dr===2*dir && ri===startRank && !b[to] && !b[sqName(fi,ri+dir)]) return true;
+      return false;
+    }
+  }
+  if(pt==='N'){
+    return (Math.abs(df)===1&&Math.abs(dr)===2)||(Math.abs(df)===2&&Math.abs(dr)===1);
+  }
+  if(pt==='K'){
+    return Math.abs(df)<=1 && Math.abs(dr)<=1;
+  }
+  if(pt==='B'){
+    if(Math.abs(df)!==Math.abs(dr)||df===0) return false;
+    return !blocked(b,fi,ri,ft,rt);
+  }
+  if(pt==='R'){
+    if(df!==0&&dr!==0) return false;
+    return !blocked(b,fi,ri,ft,rt);
+  }
+  if(pt==='Q'){
+    if(df===0||dr===0||(Math.abs(df)===Math.abs(dr))){
+      return !blocked(b,fi,ri,ft,rt);
+    }
+    return false;
+  }
+  return false;
+}
+
+function blocked(b,fi,ri,ft,rt){
+  const sf=Math.sign(ft-fi), sr=Math.sign(rt-ri);
+  let cf=fi+sf, cr=ri+sr;
+  while(cf!==ft||cr!==rt){
+    if(b[sqName(cf,cr)]) return true;
+    cf+=sf; cr+=sr;
+  }
+  return false;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SCENARIO BUILDER — flattens tree into list of paths
+// ════════════════════════════════════════════════════════════════════
+function buildScenarios(tree, side) {
+  const scenarios = [];
+
+  // First move is always d4 (white) or handled by opponent
+  const firstMove = side==='white' ? '1.d4' : null;
+
+  function walk(node, pathMoves) {
+    // pathMoves = array of {san, color ('w'|'b'), isYou}
+    // Add opponent move (node.m)
+    const oppColor = side==='white' ? 'b' : 'w';
+    const youColor = side==='white' ? 'w' : 'b';
+
+    // Extract move number from notation like "2...d5" -> move 2, black
+    const newPath = [...pathMoves, {san: node.m, isYou: false}];
+
+    if(node.r) {
+      const withReply = [...newPath, {san: node.r, isYou: true}];
+      if(!node.ch || node.ch.length===0){
+        scenarios.push(withReply);
+      } else {
+        node.ch.forEach(child => walk(child, withReply));
+      }
+    } else {
+      scenarios.push(newPath);
+    }
+  }
+
+  tree.forEach(root => walk(root, []));
+  return scenarios;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Convert scenario to board states
+// ════════════════════════════════════════════════════════════════════
+function scenarioToStates(scenario, side) {
+  const states = [];
+  let board = initBoard();
+  setupStartPos(board);
+  states.push({board: cloneBoard(board), from:null, to:null, san:null, isYou:null});
+
+  // First: if white, play 1.d4
+  if(side==='white'){
+    const res = applyMove(board,'d4','w');
+    if(res){
+      board=res.board;
+      states.push({board:cloneBoard(board), from:res.from, to:res.to, san:'1.d4', isYou:true});
+    }
+  }
+
+  // Then play through scenario moves
+  for(const mv of scenario){
+    // Determine color from the board's current turn
+    const color = board.turn;
+    const sanClean = mv.san.replace(/^\d+\.+\s*/,'').trim();
+    const res = applyMove(board, sanClean, color);
+    if(res){
+      board=res.board;
+      states.push({board:cloneBoard(board), from:res.from, to:res.to, san:mv.san, isYou:mv.isYou});
+    } else {
+      // Move parsing failed — still advance
+      states.push({board:cloneBoard(board), from:null, to:null, san:mv.san, isYou:mv.isYou, failed:true});
+    }
+  }
+  return states;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════════
+let curMode = 'coevolve', curSide = 'white';
+let scenarios = [];
+let curScenario = 0;
+let boardStates = [];
+let curStateIdx = 0;
+let autoTimer = null;
+let flipped = false;
+
+// ════════════════════════════════════════════════════════════════════
+// UI SETUP
+// ════════════════════════════════════════════════════════════════════
+function buildBoard() {
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML='';
+  const rankLabels = document.getElementById('rankLabels');
+  rankLabels.innerHTML='';
+  const fileLabels = document.getElementById('fileLabels');
+  fileLabels.innerHTML='';
+
+  const ranks = flipped ? [1,2,3,4,5,6,7,8] : [8,7,6,5,4,3,2,1];
+  const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
+
+  for(const r of ranks){
+    const span=document.createElement('span');
+    span.textContent=r;
+    rankLabels.appendChild(span);
+  }
+  for(const f of files){
+    const span=document.createElement('span');
+    span.textContent=f;
+    fileLabels.appendChild(span);
+  }
+
+  for(const r of ranks){
+    for(const f of files){
+      const sq=document.createElement('div');
+      const isLight=(fileIdx(f)+rankIdx(''+r))%2===0;
+      sq.className='sq '+(isLight?'light':'dark');
+      sq.dataset.sq=f+''+r;
+      boardEl.appendChild(sq);
+    }
+  }
+}
+
+function renderBoard() {
+  const state = boardStates[curStateIdx];
+  if(!state) return;
+  const b = state.board.squares;
+
+  document.querySelectorAll('.sq').forEach(sqEl=>{
+    const sq=sqEl.dataset.sq;
+    const isLight=(fileIdx(sq[0])+rankIdx(sq[1]))%2===0;
+    // Determine highlight
+    let cls = isLight?'light':'dark';
+    if(state.from && sq===state.from) cls=isLight?'hl-light':'hl-dark';
+    else if(state.to && sq===state.to) cls=isLight?'hl-light':'hl-dark';
+    sqEl.className='sq '+cls;
+    sqEl.innerHTML='';
+
+    const piece=b[sq];
+    if(piece && PIECES[piece]){
+      sqEl.textContent=PIECES[piece];
+      sqEl.style.color=piece[0]==='w'?'#fff':'#1a1a1a';
+      sqEl.style.textShadow=piece[0]==='w'?'0 1px 3px rgba(0,0,0,0.7)':'0 1px 3px rgba(255,255,255,0.3)';
+    }
+  });
+
+  updateMoveLog();
+  updateInfo();
+  updateCounter();
+}
+
+function updateCounter(){
+  const total=boardStates.length-1;
+  document.getElementById('moveCounter').textContent=`${curStateIdx} / ${total}`;
+  document.getElementById('btnFirst').disabled=curStateIdx===0;
+  document.getElementById('btnPrev').disabled=curStateIdx===0;
+  document.getElementById('btnNext').disabled=curStateIdx>=total;
+  document.getElementById('btnLast').disabled=curStateIdx>=total;
+}
+
+function updateMoveLog(){
+  const log=document.getElementById('moveLog');
+  log.innerHTML='';
+  // Group into pairs (white, black)
+  const moves=boardStates.slice(1);
+  let rowHtml='';
+  let moveNum=1;
+  let side=curSide==='white'?'w':'b';
+
+  for(let i=0;i<moves.length;i++){
+    const mv=moves[i];
+    const stateIdx=i+1;
+    const isActive=stateIdx===curStateIdx;
+    const youCls=mv.isYou?'you-move':'opp-move';
+    const activeCls=isActive?'active-move':'';
+    const san=mv.san?mv.san.replace(/^\d+\.+\s*/,''):'-';
+
+    // Show move number every 2 moves (or at start)
+    if(i%2===0){
+      if(rowHtml) log.innerHTML+=rowHtml;
+      const num=Math.floor(i/2)+1;
+      rowHtml=`<div class="move-row"><div class="move-num">${num}.</div>`;
+    }
+    rowHtml+=`<div class="move-cell ${youCls} ${activeCls}" onclick="gotoMove(${stateIdx})">${san}</div>`;
+    if(i%2===1){
+      rowHtml+='</div>';
+      log.innerHTML+=rowHtml;
+      rowHtml='';
+    }
+  }
+  if(rowHtml){ log.innerHTML+=rowHtml+'</div>'; }
+
+  // Scroll active into view
+  const active=log.querySelector('.active-move');
+  if(active) active.scrollIntoView({block:'nearest'});
+}
+
+function updateInfo(){
+  const total=boardStates.length-1;
+  const isEnd=curStateIdx>=total;
+  const state=boardStates[curStateIdx];
+  const pill=document.getElementById('statusPill');
+  const hint=document.getElementById('nextHint');
+  const hintLabel=document.getElementById('hintLabel');
+
+  if(isEnd){
+    pill.innerHTML='<span class="status-pill pill-complete">✓ SCENARIO COMPLETE</span>';
+    hintLabel.textContent='';
+    hint.textContent='';
+  } else {
+    const next=boardStates[curStateIdx+1];
+    const isYourTurn=next && next.isYou;
+    if(isYourTurn){
+      pill.innerHTML='<span class="status-pill pill-you">YOUR MOVE</span>';
+      hintLabel.textContent='Repertoire reply:';
+      hint.textContent=next.san||'';
+    } else {
+      pill.innerHTML='<span class="status-pill pill-opp">OPPONENT</span>';
+      hintLabel.textContent='Opponent plays:';
+      hint.textContent=next.san||'';
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SCENARIO LIST
+// ════════════════════════════════════════════════════════════════════
+function buildScenarioList(){
+  const list=document.getElementById('scenarioList');
+  list.innerHTML='';
+  scenarios.forEach((sc, i)=>{
+    const div=document.createElement('div');
+    div.className='scenario-item'+(i===curScenario?(curSide==='white'?' active':' active active-black'):'');
+    // Build display string
+    const movesHtml=sc.map(mv=>{
+      const cls=mv.isYou?'you':'opp';
+      const san=mv.san.replace(/^\d+\.+\s*/,'');
+      return `<span class="${cls}">${san}</span>`;
+    }).join('<span style="color:#3a3a50"> · </span>');
+
+    const meta = sc.length + ' moves';
+    div.innerHTML=`<div class="sc-moves">${movesHtml}</div><div class="sc-meta">${meta}</div>`;
+    div.onclick=()=>selectScenario(i);
+    list.appendChild(div);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ════════════════════════════════════════════════════════════════════
+function setMode(m){
+  curMode=m;
+  ['coevolve','static','greedy'].forEach(x=>{
+    const btn=document.getElementById('btn-'+x);
+    btn.className='btn'+(x===m?(curSide==='white'?' on-white':' on-black'):'');
+  });
+  reload();
+}
+function setSide(s){
+  curSide=s;
+  document.getElementById('btn-white').className='btn'+(s==='white'?' on-white':'');
+  document.getElementById('btn-black').className='btn'+(s==='black'?' on-black':'');
+  flipped=s==='black';
+  reload();
+}
+function reload(){
+  stopAuto();
+  const tree=REPERTOIRE[curMode][curSide];
+  scenarios=buildScenarios(tree, curSide);
+  curScenario=0;
+  selectScenario(0);
+}
+function selectScenario(i){
+  stopAuto();
+  curScenario=i;
+  buildScenarioList();
+  boardStates=scenarioToStates(scenarios[i], curSide);
+  curStateIdx=0;
+  buildBoard();
+  renderBoard();
+}
+function gotoMove(idx){
+  curStateIdx=Math.max(0,Math.min(idx,boardStates.length-1));
+  renderBoard();
+}
+function stepMove(dir){
+  gotoMove(curStateIdx+dir);
+}
+function toggleAuto(){
+  if(autoTimer){ stopAuto(); return; }
+  const btn=document.getElementById('autoBtn');
+  btn.textContent='⏹ STOP';
+  btn.classList.add('playing');
+  function step(){
+    if(curStateIdx>=boardStates.length-1){
+      stopAuto(); return;
+    }
+    stepMove(1);
+    autoTimer=setTimeout(step,900);
+  }
+  step();
+}
+function stopAuto(){
+  if(autoTimer){ clearTimeout(autoTimer); autoTimer=null; }
+  const btn=document.getElementById('autoBtn');
+  btn.textContent='▶ AUTO';
+  btn.classList.remove('playing');
+}
+
+// Keyboard
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='ArrowDown') stepMove(1);
+  if(e.key==='ArrowLeft'||e.key==='ArrowUp') stepMove(-1);
+  if(e.key==='Home') gotoMove(0);
+  if(e.key==='End') gotoMove(9999);
+});
+
+// ════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════
+loadData();
+</script>
+</body>
+</html>
