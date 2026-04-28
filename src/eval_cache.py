@@ -6,7 +6,7 @@ graph, for each rating band.
 
 import pickle
 
-from src.config import RATING_BANDS, SHRINKAGE_TAU as TAU, PRIOR_MAX_PLY
+from src.config import RATING_BANDS, PRIOR_MAX_PLY
 
 
 # ── Core functions ─────────────────────────────────────────────────────────────
@@ -53,9 +53,7 @@ def build_eval_cache(graph: dict) -> dict:
             if n == 0:
                 score = prior_mean
             else:
-                raw = (stats["wins"] + 0.5 * stats["draws"]) / n
-                # shrunk = (n * raw + TAU * prior_mean) / (n + TAU)  # shrinkage (disabled)
-                score = raw
+                score = (stats["wins"] + 0.5 * stats["draws"]) / n
             band_scores[band] = score
         scores[fen] = band_scores
 

@@ -1,27 +1,20 @@
 """
 C3 — Rating-band base policies
-Compute per-band move distributions from the training graph,
-with additive smoothing toward the aggregate distribution.
+Compute per-band move distributions from the training graph.
 """
 
 import pickle
-import logging
 from itertools import combinations
 from typing import Dict
 
-from src.config import SMOOTHING_ALPHA as ALPHA, RATING_BANDS, BAND_SEPARATION_MIN_TV, BAND_SEPARATION_MIN_GAMES
-
-logger = logging.getLogger(__name__)
+from src.config import RATING_BANDS
 
 
 # ── Core computation ──────────────────────────────────────────────────────────
 
 def compute_policies(graph: dict) -> dict:
     """
-    Compute smoothed per-band move distributions for every position in *graph*.
-
-    Formula (Section E, C3):
-        policy[b][p][m] = (band_count[m] + α * aggregate_prob[m]) / (band_total + α)
+    Compute per-band move distributions for every position in *graph*.
 
     When band_total == 0  →  policy[b][p][m] = aggregate_prob[m]  (fallback).
 
@@ -54,15 +47,13 @@ def compute_policies(graph: dict) -> dict:
                 for m, c in children.items()
             }
 
-        # ── per-band policy (no smoothing — all positions have band_total > 0) ──
+        # ── per-band policy ───────────────────────────────────────────────────
         for band in RATING_BANDS:
             band_total = sum(c["band_counts"][band] for c in children.values())
 
             policy: Dict[str, float] = {}
             for m, c in children.items():
                 band_count = c["band_counts"][band]
-                # numerator = band_count + ALPHA * agg_prob[m]  # Laplace smoothing (disabled)
-                # denominator = band_total + ALPHA               # Laplace smoothing (disabled)
                 policy[m] = band_count / band_total if band_total > 0 else agg_prob[m]
 
             base_policies[band][fen] = policy
@@ -83,7 +74,7 @@ def band_separation_check(base_policies: dict, graph: dict) -> float:
     nodes = graph["nodes"]
     qualifying_fens = [
         fen for fen, node in nodes.items()
-        if node.get("total_games", 0) >= BAND_SEPARATION_MIN_GAMES
+        if node.get("total_games", 0) >= 500
         and node.get("children")
     ]
 
@@ -112,14 +103,7 @@ def band_separation_check(base_policies: dict, graph: dict) -> float:
         print(f"     {b1} vs {b2}: {mv:.4f}")
     print(f"[C3] Overall mean TV distance: {mean_tv:.4f}")
 
-    if mean_tv < BAND_SEPARATION_MIN_TV:
-        logger.warning(
-            "[C3] Mean TV distance %.4f is below 0.05 threshold. "
-            "Bands may be too similar to support a meaningful CVaR story.",
-            mean_tv,
-        )
-    else:
-        print(f"[C3] Band separation check PASSED (mean TV = {mean_tv:.4f} >= 0.05).")
+    print(f"[C3] Band separation check: mean TV = {mean_tv:.4f}.")
 
     return mean_tv
 
