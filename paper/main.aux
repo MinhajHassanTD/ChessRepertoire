@@ -1,0 +1,116 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{section.1}\protected@file@percent }
+\citation{walczak1996}
+\citation{marzo2023}
+\citation{fogel2004}
+\citation{hillis1990}
+\citation{rosin1997}
+\citation{ramos2016}
+\citation{lehman2011}
+\citation{rockafellar2000}
+\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Chess databases and opening book tools.}{2}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Self-learning evolutionary chess programs.}{2}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}Co-evolutionary algorithms.}{2}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-D}}Novelty and diversity.}{2}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-E}}Robust and risk-aware optimization.}{2}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {III}Problem Formulation}{2}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Position Graph}{2}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Per-Band Move Policies}{2}{subsection.3.2}\protected@file@percent }
+\newlabel{eq:policy}{{1}{2}{Per-Band Move Policies}{equation.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Position Evaluation}{2}{subsection.3.3}\protected@file@percent }
+\newlabel{eq:eval}{{2}{2}{Position Evaluation}{equation.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Repertoire and Closure Constraint}{2}{subsection.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-E}}Scoring and Fitness}{2}{subsection.3.5}\protected@file@percent }
+\citation{lichess}
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Methodology}{3}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Data Collection and Preprocessing}{3}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}System Architecture}{3}{subsection.4.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces System Architecture: Data Pipeline (blue), Genetic Algorithm Loop (green), Co-Evolutionary Opponent Population {\scshape Coevolve} only (orange), and Held-Out Evaluation (purple).}}{3}{figure.1}\protected@file@percent }
+\newlabel{fig:arch}{{1}{3}{System Architecture: Data Pipeline (blue), Genetic Algorithm Loop (green), Co-Evolutionary Opponent Population {\scshape Coevolve} only (orange), and Held-Out Evaluation (purple)}{figure.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Repertoire Chromosome and Initialization}{3}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Mutation Operators}{3}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}Crossover}{3}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-F}}Selection and Diversity Maintenance}{3}{subsection.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-G}}Co-evolutionary Opponent Model}{4}{subsection.4.7}\protected@file@percent }
+\newlabel{eq:oppfit}{{4}{4}{Co-evolutionary Opponent Model}{equation.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-H}}Fitness Evaluation for Repertoires}{4}{subsection.4.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-I}}Non-GA Baselines}{4}{subsection.4.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-J}}Experimental Setup}{4}{subsection.4.10}\protected@file@percent }
+\newlabel{sec:setup}{{\mbox  {IV-J}}{4}{Experimental Setup}{subsection.4.10}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Held-out score distributions at $B = 10$ ($n=30$ seeds). All the optimized methods significantly outperform Random and Baseline.}}{4}{figure.2}\protected@file@percent }
+\newlabel{fig:score_dist10}{{2}{4}{Held-out score distributions at $B = 10$ ($n=30$ seeds). All the optimized methods significantly outperform Random and Baseline}{figure.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Fixed hyperparameters used in all experiments.}}{4}{table.1}\protected@file@percent }
+\newlabel{tab:hyperparams}{{I}{4}{Fixed hyperparameters used in all experiments}{table.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {V}Results}{4}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Main Comparison}{4}{subsection.5.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Held-out scores for all five methods at both budget levels ($n=30$ seeds).}}{5}{table.2}\protected@file@percent }
+\newlabel{tab:main}{{II}{5}{Held-out scores for all five methods at both budget levels ($n=30$ seeds)}{table.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Held-out score distributions at $B = 25$ ($n=30$ seeds). All optimized methods significantly outperform Random and Baseline.}}{5}{figure.3}\protected@file@percent }
+\newlabel{fig:score_dist25}{{3}{5}{Held-out score distributions at $B = 25$ ($n=30$ seeds). All optimized methods significantly outperform Random and Baseline}{figure.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces GA vs.\ non-GA baselines at $B = 10$ (per-seed scores).}}{5}{figure.4}\protected@file@percent }
+\newlabel{fig:ga_vs_nonga10}{{4}{5}{GA vs.\ non-GA baselines at $B = 10$ (per-seed scores)}{figure.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces GA vs.\ non-GA baselines at $B = 25$ (per-seed scores).}}{5}{figure.5}\protected@file@percent }
+\newlabel{fig:ga_vs_nonga25}{{5}{5}{GA vs.\ non-GA baselines at $B = 25$ (per-seed scores)}{figure.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}GA vs.\ Non-GA Baselines}{5}{subsection.5.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Closure ON vs.\ OFF at $B = 10$.}}{5}{figure.6}\protected@file@percent }
+\newlabel{fig:closure10}{{6}{5}{Closure ON vs.\ OFF at $B = 10$}{figure.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Closure ON vs.\ OFF at $B = 25$.}}{5}{figure.7}\protected@file@percent }
+\newlabel{fig:closure25}{{7}{5}{Closure ON vs.\ OFF at $B = 25$}{figure.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}Closure Ablation}{5}{subsection.5.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Pairwise statistical comparisons between all methods at $B = 10$.}}{6}{table.3}\protected@file@percent }
+\newlabel{tab:pairwise10}{{III}{6}{Pairwise statistical comparisons between all methods at $B = 10$}{table.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {IV}{\ignorespaces Pairwise statistical comparisons between all methods at $B = 25$.}}{6}{table.4}\protected@file@percent }
+\newlabel{tab:pairwise25}{{IV}{6}{Pairwise statistical comparisons between all methods at $B = 25$}{table.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {V}{\ignorespaces Effect of the closure rule on held-out scores at both budget levels ($n=30$ seeds).}}{6}{table.5}\protected@file@percent }
+\newlabel{tab:closure}{{V}{6}{Effect of the closure rule on held-out scores at both budget levels ($n=30$ seeds)}{table.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Per-band held-out scores at $B = 10$.}}{6}{figure.8}\protected@file@percent }
+\newlabel{fig:band10}{{8}{6}{Per-band held-out scores at $B = 10$}{figure.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Per-band held-out scores at $B = 25$.}}{6}{figure.9}\protected@file@percent }
+\newlabel{fig:band25}{{9}{6}{Per-band held-out scores at $B = 25$}{figure.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}Robustness Across Rating Bands}{6}{subsection.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-E}}GA Convergence Dynamics}{6}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-F}}Coevolution Dynamics}{6}{subsection.5.6}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Training fitness over 100 generations at $B = 10$ (mean $\pm $ 95\% CI, $n=30$ seeds).}}{7}{figure.10}\protected@file@percent }
+\newlabel{fig:conv10}{{10}{7}{Training fitness over 100 generations at $B = 10$ (mean $\pm $ 95\% CI, $n=30$ seeds)}{figure.10}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Training fitness over 100 generations at $B = 25$ (mean $\pm $ 95\% CI, $n=30$ seeds). }}{7}{figure.11}\protected@file@percent }
+\newlabel{fig:conv25}{{11}{7}{Training fitness over 100 generations at $B = 25$ (mean $\pm $ 95\% CI, $n=30$ seeds)}{figure.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces {\scshape Coevolve} dynamics at $B = 10$ ($n=30$ seeds): training fitness (a), repertoire diversity (b), opponent diversity (c).}}{7}{figure.12}\protected@file@percent }
+\newlabel{fig:dyn10}{{12}{7}{{\scshape Coevolve} dynamics at $B = 10$ ($n=30$ seeds): training fitness (a), repertoire diversity (b), opponent diversity (c)}{figure.12}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces {\scshape Coevolve} dynamics at $B = 25$ ($n=30$ seeds): training fitness (a), repertoire diversity (b), opponent diversity (c).}}{7}{figure.13}\protected@file@percent }
+\newlabel{fig:dyn25}{{13}{7}{{\scshape Coevolve} dynamics at $B = 25$ ($n=30$ seeds): training fitness (a), repertoire diversity (b), opponent diversity (c)}{figure.13}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {VI}{\ignorespaces Wall-clock runtime for all methods at both budget levels ($n=30$ seeds).}}{7}{table.6}\protected@file@percent }
+\newlabel{tab:runtime}{{VI}{7}{Wall-clock runtime for all methods at both budget levels ($n=30$ seeds)}{table.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-G}}Example Repertoire}{7}{subsection.5.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-H}}Computational Cost}{7}{subsection.5.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Discussion}{7}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-A}}The Closure Rule Is the Decisive Contribution}{7}{subsection.6.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces Best \textsc  {Coevolve} repertoire at $B = 10$, visualized as a Sankey diagram. Blue boxes represent committed moves; gray flows represent opponent responses. (a) As White, the model opens 1.d4, committing to the Queen's Gambit (2.c4) against 1...d5 and the Jobava London System (2.Nc3) against 1...Nf6. (b) As Black, the model meets 1.e4 with the Sicilian Defense (1...c5) and responds to 1.d4 with 1...Nf6, adopting King's Indian-style structures (g6, Bg7) or Benoni-style counters (c5) based on White's continuation.}}{8}{figure.14}\protected@file@percent }
+\newlabel{fig:repgraph}{{14}{8}{Best \textsc {Coevolve} repertoire at $B = 10$, visualized as a Sankey diagram. Blue boxes represent committed moves; gray flows represent opponent responses. (a) As White, the model opens 1.d4, committing to the Queen's Gambit (2.c4) against 1...d5 and the Jobava London System (2.Nc3) against 1...Nf6. (b) As Black, the model meets 1.e4 with the Sicilian Defense (1...c5) and responds to 1.d4 with 1...Nf6, adopting King's Indian-style structures (g6, Bg7) or Benoni-style counters (c5) based on White's continuation}{figure.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-B}}Co-Evolution Adds No Benefit Over a Static Opponent}{8}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-C}}The Fitness Landscape Favours Simple Local Search}{8}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-D}}A Tighter Budget Does Not Hurt Performance}{8}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-E}}Limitations}{8}{subsection.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Conclusion}{8}{section.7}\protected@file@percent }
+\bibstyle{IEEEtran}
+\bibdata{references}
+\bibcite{walczak1996}{1}
+\bibcite{marzo2023}{2}
+\bibcite{fogel2004}{3}
+\bibcite{hillis1990}{4}
+\bibcite{rosin1997}{5}
+\bibcite{ramos2016}{6}
+\bibcite{lehman2011}{7}
+\bibcite{rockafellar2000}{8}
+\bibcite{lichess}{9}
+\@writefile{toc}{\contentsline {section}{\numberline {VIII}Future Work}{9}{section.8}\protected@file@percent }
+\newlabel{sec:future}{{VIII}{9}{Future Work}{section.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VIII-A}}Richer Opponent Models for Meaningful Co-Evolutionary Pressure}{9}{subsection.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VIII-B}}Deeper Position Graphs}{9}{subsection.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VIII-C}}Engine-Grounded Evaluation}{9}{subsection.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VIII-D}}Joint White--Black Co-Evolution}{9}{subsection.8.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{References}{9}{section*.2}\protected@file@percent }
+\gdef \@abspage@last{9}

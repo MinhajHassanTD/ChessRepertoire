@@ -1,6 +1,7 @@
 \documentclass[conference]{IEEEtran}
 \IEEEoverridecommandlockouts
 
+\usepackage{fix-cm}
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{algorithmic}
@@ -15,6 +16,7 @@
 \usepackage{siunitx}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
 \newcommand{\cmark}{\checkmark}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -34,11 +36,11 @@
 
 % -------------------------------------------------------------------------
 \begin{abstract}
-This paper studies whether a novel closure rule, optimized via Genetic Algorithm (GA) or local search techniques, improves the robustness of chess opening repertoires across varying opponent skill levels. The repertoire is memorization-constrained, retaining a budget of $\mathcal{B}$ moves per color, and must cover all opponent replies played in at least 15\% of observed Lichess games at any reached position (closure-constrained). We compare five methodologies over 30 independent seeds: a most-played heuristic baseline, random search, a greedy hillclimber, a standard GA (\textsc{Static}), and a co-evolutionary GA (\textsc{Coevolve}) where the repertoire and opponent populations evolve together. A CVaR-weighted fitness objective was applied; held-out evaluation always measures the expected score across three rating bands (1000--1399, 1400--1799, 1800--2199) to reward both mean performance and worst-case robustness. The closure rule emerges as the dominant factor, yielding a consistent +2.3 percentage-point improvement in held-out expected score with a perfect effect size ($A_{12} = 1.0$, $p < 7.5 \times 10^{-9}$), while \textsc{Coevolve} offers no statistically significant benefit over \textsc{Static} ($A_{12}=0.45$, $p=1.0$) despite a 35$\times$ computational cost. Furthermore, the greedy hillclimber matches GA-quality solutions at a fraction of the runtime, suggesting the closure-constrained fitness landscape responds well to local search.
+This paper studies whether a closure rule, optimized via Genetic Algorithm (GA) or local search techniques, improves the robustness of chess opening repertoires across varying opponent skill levels. The repertoire is memorization-constrained, retaining a budget of $\mathcal{B}$ moves per color, and must cover all opponent replies played in at least 15\% of observed Lichess games at any reached position (closure-constrained). We compare five methodologies over 30 independent seeds: a most-played heuristic baseline, random search, a greedy hillclimber, a standard GA (\textsc{Static}), and a co-evolutionary GA (\textsc{Coevolve}) where the repertoire and opponent populations evolve together. A CVaR-weighted fitness objective was applied; held-out evaluation always measures the expected score across three rating bands (1000 -- 1399, 1400 -- 1799, 1800 -- 2199) to reward both mean performance and worst-case robustness. The closure rule emerges as the dominant factor, yielding a consistent $+0.023$ improvement in held-out expected score with a perfect effect size ($A_{12} = 1.0$, $p < 7.5 \times 10^{-9}$), while \textsc{Coevolve} offers no statistically significant benefit over \textsc{Static} ($A_{12}=0.45$, $p=1.0$) despite a 35$\times$ computational cost. Furthermore, the greedy hillclimber matches GA-quality solutions at a fraction of the runtime, suggesting the closure-constrained fitness landscape responds well to local search.
 \end{abstract}
 
 \begin{IEEEkeywords}
-chess, co-evolutionary, constrained combinatorial optimization, genetic algorithm, opening repertoire 
+chess, co-evolutionary, constrained combinatorial optimization, genetic algorithm, opening repertoire
 \end{IEEEkeywords}
 
 
@@ -58,7 +60,7 @@ Chess opening preparation can be fundamentally modeled as an optimization
     the moves and their responses, and the finite memorization budget a player
     possesses. This makes opening preparation an instance of constrained
     combinatorial optimization across shifting opponent skill levels.
-    
+
     What makes this hard is the sheer scale of the search space. A database
     built from real Lichess games exposes hundreds of distinct positions.
     Picking lines that together cover all critical opponent replies, without
@@ -74,27 +76,19 @@ Chess opening preparation can be fundamentally modeled as an optimization
     work well against a positional opponent might fail against an aggressive
     player, and a repertoire tuned to perform well on average can hide systematic
     weaknesses that overall statistics simply obscure.
-    
+
     We treat the problem as \emph{robust constrained optimization}, defined
     formally as extracting a budget-constrained subgraph of the chess position
     graph where the system must handle the most likely opponent continuations.
-    % The key mechanisms are: (i)~a memorization budget condition of 10 or 25
-    % committed moves per color; (ii)~a closure rule forcing coverage of all
-    % opponent replies played in ${\geq}15\%$ of observed games at any reached
-    % position; (iii)~a CVaR-robust fitness function rewarding both mean
-    % performance and robustness against the worst-case opponent skill level;
-    % (iv)~three rating bands (1000--1399, 1400--1799, 1800--2199); and (v)~the
-    % use of a genetic algorithm (GA) to navigate a space where gradient methods
-    % do not apply and changing one committed move cascades through the tree. 
     Repertoires are selected from millions of Lichess rapid and classical games
     organized by rating band, with per-band move statistics computed for each
     node. Fitness is optimized through a population of candidates exploring the
     space in parallel, with controlled evaluation conducted over 30 independent
-    seeds. Comparisons are made at a matched evaluation budget using Wilcoxon
+    seeds. Comparisons are made using Wilcoxon
     signed-rank tests and Vargha-Delaney effect sizes, identifying the closure
     rule as a decisive factor yielding a perfect effect size ($A_{12} = 1.0$,
-    $p < 7.5 \times 10^{-9}$) and a +2.3 percentage-point improvement.
-    
+    $p < 7.5 \times 10^{-9}$) and a $+0.023$ improvement.
+
     The central design question is what opponent model to train against. A
     standard GA ({\scshape Static}) evaluates against a fixed, uniform mix of
     all three rating bands. A co-evolutionary model ({\scshape Coevolve}) lets
@@ -102,8 +96,9 @@ Chess opening preparation can be fundamentally modeled as an optimization
     population, guided by performance, novelty, and a Hall of Fame of informative
     opponents. We ask which methodology yields optimal results: static evolution,
     adversarial co-evolution, random search, a most-played heuristic, or a greedy
-    hillclimber. 
-    We implemented the fully automated system and found that
+    hillclimber.
+
+    We implemented the fully automated model and found that
     co-evolution adds no measurable benefit over the static GA ($p = 1.0$,
     $A_{12} = 0.45$) despite a 35$\times$ computational cost, while the greedy
     hillclimber matches GA-quality solutions, suggesting the closure-constrained
@@ -115,16 +110,13 @@ Chess opening preparation can be fundamentally modeled as an optimization
 \subsection{Chess databases and opening book tools.}
 Walczak~\cite{walczak1996} showed that adapting an opening book to model
 opponent style produces measurable improvements, an early indication that
-opponent-awareness matters in opening preparation. Fogel~\cite{fogel2004}
-applied neuroevolution to train a self-learning chess evaluation function,
-establishing evolutionary computation as a viable approach to chess-specific
-optimization. More recently, Marzo and Servedio~\cite{marzo2023} analyzed
-large-scale Lichess data and found statistically significant differences in
-move preferences across rating bands, which directly motivates our per-band
-fitness formulation.
+opponent-awareness matters in opening preparation. More recently, Marzo and
+Servedio~\cite{marzo2023} analyzed large-scale Lichess data and found
+statistically significant differences in move preferences across rating bands,
+which directly motivates our per-band fitness formulation.
 
-\subsection{Self-Learning Evolutionary Chess Programs}
-    
+\subsection{Self-learning evolutionary chess programs.}
+
     Fogel et al.~\cite{fogel2004} present a chess engine that evolves its
     evaluation parameters, material values, a positional value table, and
     neural networks, using GA through random mutation and competitive parent
@@ -157,7 +149,7 @@ worst-case outcomes rather than just averaging over them
 
 \subsection{Position Graph}
 
-We model chess as a directed graph $\mathcal{G} = (\mathcal{V}, \mathcal{E})$, where each node $v \in \mathcal{V}$ is a chess position and each edge $(v, v') \in \mathcal{E}$ is a legal move from $v$ to $v'$. Positions are stored as truncated FEN strings (piece layout, whose turn it is, castling rights, and en passant square; move counters are dropped so that positions reached by different move orders are treated as the same node). Each node records whose turn it is and its depth $d(v) \in \{0, \ldots, D_{\max}\}$, with $D_{\max} = 10$. For each rating band $b \in \mathcal{B} = \{1000\text{ -- }1399, 1400\text{ -- }1799, 1800\text{ -- }2199\}$, every edge stores how often that move was played and how the game ended (white win, draw, or loss), taken from the Lichess database.
+We model chess as a directed graph $\mathcal{G} = (\mathcal{V}, \mathcal{E})$, where each node $v \in \mathcal{V}$ is a chess position and each edge $(v, v') \in \mathcal{E}$ is a legal move from $v$ to $v'$. Positions are stored as truncated FEN strings (piece layout, whose turn it is, castling rights, and en passant square). Each node records whose turn it is and its depth $d(v) \in \{0, \ldots, D_{\max}\}$, with $D_{\max} = 10$. For each rating band $b \in \mathcal{B} = \{1000\text{ -- }1399, 1400\text{ -- }1799, 1800\text{ -- }2199\}$, every edge stores how often that move was played and how the game ended (white win, draw, or loss), taken from the Lichess database.
 
 \subsection{Per-Band Move Policies}
 
@@ -181,7 +173,7 @@ where $N_b(v)$ is the total number of games passing through $v$ in band $b$. A d
 
 A repertoire is not just a list of moves, it is a complete game plan. When it is our turn, we pick one move and commit to it. When it is the opponent's turn, we must have an answer ready for every reply they are likely to make.
 
-We track two things: a set of committed moves (one per our-turn position), and a reached set, all positions the game can actually reach if both sides follow the repertoire. The budget $B$ limits how many of our-turn moves we can commit to.
+We track two things: a set of committed moves (one per our-turn position), and a reached set --- all positions the game can actually reach if both sides follow the repertoire. The budget $B$ limits how many of our-turn moves we can commit to.
 
 The closure rule fills in the gaps. At any opponent-turn position in the reached set, if the opponent plays a move in at least 15\% of recorded games, the position after that move must also be in the reached set. In other words, the repertoire cannot ignore a common opponent reply just because it is inconvenient. Whenever a new position is added to the reached set, we immediately check all opponent replies at that position and add any that cross the 15\% threshold, repeating this process until no new positions are added.
 
@@ -197,9 +189,9 @@ This gives a single expected score for the repertoire against a given rating ban
 
 A good repertoire must hold up against all skill levels, not just one. Given an opponent mixture $\boldsymbol{\pi} \in \{\pi_1, \pi_2, \pi_3 \}$ over the three rating bands, the fitness is:
 \begin{equation}
-F(\mathcal{R}) = \sum_{i=1}^{3} \pi_i, s_{b_i}(\mathcal{R}) + \lambda \cdot \min_i ( s_{b_i}(\mathcal{R})),
+F(\mathcal{R}) = \sum_{i=1}^{3} \pi_i \cdot s_{b_i}(\mathcal{R}) + \lambda \cdot \min_i ( s_{b_i}(\mathcal{R})),
 \end{equation}
-with $\lambda = 1.0$. The first term is the weighted average score across bands; the second adds a bonus equal to the score on the worst band. This pushes the optimizer to fix weak spots rather than pile up points against easier opponents.
+with $\lambda = 1.0$. The first term is the weighted average score across bands and the second adds a bonus equal to the score on the worst band. This pushes the optimizer to fix weak spots rather than pile up points against easier opponents.
 
 
 % =========================================================================
@@ -224,6 +216,7 @@ onwards and is used only to evaluate the final best repertoire from each
 run, under a uniform opponent mixture.
 
 \subsection{System Architecture}
+
 
 \begin{figure}[!ht]
   \centering
@@ -269,8 +262,8 @@ run, under a uniform opponent mixture.
   \draw[arr] (graph) to[bend left=35] (ec);
 
   % Row 2: GA core (repop centred under graph)
-  \node[gabox, below=0.85cm of graph] (repop) {Repertoire\\Pop.\;($n$=50)};
-  \node[gabox, left=of repop]  (fit) {Fitness\\Eval.};
+  \node[gabox, below=0.85cm of graph] (repop) {Repertoire\\Population};
+  \node[gabox, left=of repop]  (fit) {Fitness\\Evaluation};
   \node[gabox, right=of repop] (sel) {Tournament\\Select};
   \node[gabox, right=of sel]   (cop) {Crossover\\+ Mutate};
 
@@ -293,9 +286,9 @@ run, under a uniform opponent mixture.
   \draw[arr] (div) edge[bend right=25] (repop);
 
   % Row 3: Opponent co-evolution (COEVOLVE only) — below div
-  \node[obox, below=0.50cm of div] (oppop) {\scshape Coevolve:\\Opponent\\Pop.\;($n$=50)};
-  \node[smallbox, left=of oppop]  (hof) {Hall of\\Fame ($k$=10)};
-  \node[smallbox, right=of oppop] (nov) {Exploit.\\+ Novelty};
+  \node[obox, below=0.50cm of div] (oppop) {\scshape Coevolve:\\Opponent\\Population};
+  \node[smallbox, left=of oppop]  (hof) {Hall of\\Fame};
+  \node[smallbox, right=of oppop] (nov) {Exploitation\\+ Novelty};
 
   \draw[arr] (oppop) -- (hof);
   \draw[arr] (hof)   edge[bend left=16] (fit);
@@ -303,7 +296,7 @@ run, under a uniform opponent mixture.
   \draw[arr] (nov)   edge[bend left=10] (oppop);
 
   % Curved vs. arrow looping around the left side
-  \draw[darr] (repop.west) to[out=180, in=180, looseness=0.3] 
+  \draw[darr] (repop.west) to[out=-120, in=120, looseness=0.8] 
               node[label, right=2pt]{} (oppop.west);
 
   % Held-out eval — right of nov, same height
@@ -311,7 +304,7 @@ run, under a uniform opponent mixture.
     (heldout) {Held-out\\Evaluation};
     
   % Curved arrow from Repertoire Pop to Held-out Evaluation (sharper arc with looseness=0.5)
-  \draw[arr] (repop.east) to[out=0, in=90, looseness=0.3] (heldout.north);
+  \draw[arr] (repop.east) to[out=-100, in=120, looseness=0.3] (heldout.north);
 
   % Bounding boxes + labels
   \begin{scope}[on background layer]
@@ -325,23 +318,16 @@ run, under a uniform opponent mixture.
           fit=(oppop)(hof)(nov),
           label={[label]below:\textbf{Co-evolution ({\scshape Coevolve} only)}}] {};
   \end{scope}
-
   \end{tikzpicture}%
   }
-  \caption{System architecture. The data pipeline (blue) crawls Lichess,
-    builds a position graph, and precomputes per-band policies and
-    evaluation scores. The GA loop (green) optimizes a population of repertoires
-    via tournament selection, subtree-graft crossover, and four mutation operators,
-    with diversity re-initialization when mean pairwise Jaccard distance falls
-    below 0.25. {\scshape Coevolve} (orange) additionally maintains a co-evolving
-    opponent population whose fitness balances exploitation and novelty, maintaining
-    a Hall of Fame of the 10 most informative past opponents. Held-out evaluation
-    (purple) uses a separate data split.}
+  \caption{System Architecture: Data Pipeline (blue), Genetic Algorithm Loop (green),
+    Co-Evolutionary Opponent Population {\scshape Coevolve} only (orange),
+    and Held-Out Evaluation (purple).}
   \label{fig:arch}
 \end{figure}
 
 Fig.~\ref{fig:arch} shows the overall system architecture. The pipeline
-comprises two phases: data preprocessing and GA Optimization.
+comprises of two phases: Data Preprocessing and GA Optimization.
 
 \subsection{Repertoire Chromosome and Initialization}
 
@@ -412,9 +398,12 @@ non-evolutionary baselines, each given the same evaluation budget of 10,000 fitn
 \subsection{Experimental Setup}
 \label{sec:setup}
 
-Table~\ref{tab:hyperparams} lists all fixed hyperparameters.  We employ the use of the following Statistical
-tests: paired Wilcoxon signed-rank (paired across seeds),
-Holm-corrected and Vargha--Delaney $A_{12}$ effect size.
+Table~\ref{tab:hyperparams} lists all fixed hyperparameters. All pairwise comparisons use a
+paired Wilcoxon signed-rank test with Holm correction; a result is significant when $p < 0.05$
+after correction. The $p$-value gives the probability of observing the measured difference by
+chance under the null hypothesis of no effect. Effect size is reported as Vargha--Delaney
+$A_{12}$: 0.5 indicates no difference between methods, 1.0 means method~A scores higher than
+method~B on every seed, and 0.0 means the reverse.
 
 \begin{table}[!ht] % Changed from !t to !ht to keep it closer to the text
   \centering
@@ -443,73 +432,6 @@ Holm-corrected and Vargha--Delaney $A_{12}$ effect size.
     \bottomrule
   \end{tabular}
 \end{table}
-% =========================================================================
-% \section{Experimental Setup}
-
-% \textbf{Data.} We use Lichess rapid and classical games crawled via
-% the Lichess Opening Explorer API. The training split covers all games
-% before June 2025; the held-out split covers games from June 2025 onwards.
-% The position graph includes all positions up to $D_{\max} = 10$ ply
-% (five full moves per side).
-
-% \textbf{Methods.} We evaluate five methods: \textsc{Baseline}
-% (most-played), \textsc{Random}, \textsc{Hillclimb}, \textsc{Static},
-% and \textsc{Coevolve}. To isolate the contribution of the closure rule,
-% we also run two ablation variants, \textsc{Static-NoClosure} and
-% \textsc{Coevolve-NoClosure}, that disable it entirely.
-
-% \textbf{Budget conditions.} All methods run under two budget constraints:
-% $B = 10$ committed moves per color (our primary condition) and $B = 25$
-% (secondary), representing compact and expanded repertoires respectively.
-
-% \textbf{Hyperparameters.} All fixed hyperparameters are listed in
-% Table~\ref{tab:hyperparams}.
-
-% \begin{table}[!t]
-%   \centering
-%   \caption{Fixed hyperparameters used in all experiments.}
-%   \label{tab:hyperparams}
-%   \renewcommand{\arraystretch}{1.10}
-%   \setlength{\tabcolsep}{5pt}
-%   \begin{tabular}{lc}
-%     \toprule
-%     \textbf{Parameter} & \textbf{Value} \\
-%     \midrule
-%     Repertoire population $n_R$   & 50 \\
-%     Opponent population $n_O$     & 50 \\
-%     Generations $G$               & 100 \\
-%     Tournament size $k$           & 2 \\
-%     Crossover rate $p_c$          & 1.0 \\
-%     Mutation rate $p_m$           & 0.5 \\
-%     Closure threshold $\theta$    & 0.15 \\
-%     CVaR weight $\lambda$         & 1.0 \\
-%     Novelty weight $\eta$         & 0.5 \\
-%     Hall of Fame size             & 10 \\
-%     Diversity threshold $J_{\min}$& 0.25 \\
-%     Max ply depth $D_{\max}$      & 10 \\
-%     Seeds                         & 30 (1000--1029) \\
-%     \bottomrule
-%   \end{tabular}
-% \end{table}
-
-% \textbf{Seeds and reproducibility.} All methods run with the same 30
-% independent random seeds (1000--1029), enabling paired statistical tests
-% that control for run-to-run variability.
-
-% \textbf{Evaluation metrics.}
-% The primary metric is the \textbf{held-out uniform mean score}: the fitness
-% of the best candidate from each run, evaluated on held-out data under the
-% uniform opponent mixture. The secondary metric is the \textbf{held-out
-% worst-band score}: the minimum score across the three rating bands, which
-% serves as a proxy for robustness.
-
-% \textbf{Statistics.} We report mean $\pm$ standard deviation across 30
-% seeds. Pairwise comparisons use two-sided Wilcoxon signed-rank tests
-% (paired within seed) with Holm correction for multiple comparisons.
-% Effect sizes use the Vargha-Delaney $A_{12}$ statistic: $A_{12} < 0.5$
-% means method A is worse, $A_{12} > 0.5$ means method A is better, and
-% $A_{12} = 0.5$ indicates no difference.
-
 
 % =========================================================================
 \section{Results}
@@ -528,16 +450,12 @@ baseline. One somewhat surprising result is that $B = 10$ slightly outperforms
 $B = 25$, suggesting that a tighter budget pushes the algorithm toward
 higher-value lines.
 
-\begin{table}[!t]
+\begin{table*}[!t]
   \centering
-  \caption{Held-out scores (mean $\pm$ std, $n=30$ seeds). \textit{Uniform
-    mean}: expected score under uniform opponent mixture. \textit{Worst
-    band}: minimum score across the three rating bands (CVaR proxy).
-    Bold indicates the top tier (Hillclimb, \textsc{Static},
-    \textsc{Coevolve} are statistically indistinguishable).}
+  \caption{Held-out scores for all five methods at both budget levels ($n=30$ seeds).}
   \label{tab:main}
   \renewcommand{\arraystretch}{1.15}
-  \setlength{\tabcolsep}{3.5pt}
+  \setlength{\tabcolsep}{6pt}
   \begin{tabular}{l cc cc}
     \toprule
     & \multicolumn{2}{c}{\textbf{Budget 10 (Primary)}}
@@ -550,155 +468,200 @@ higher-value lines.
                     & $0.492 \pm 0.000$ & $0.488 \pm 0.000$ \\
     Random search   & $0.522 \pm 0.002$ & $0.515 \pm 0.001$
                     & $0.518 \pm 0.002$ & $0.513 \pm 0.001$ \\
-    Hillclimb       & $\mathbf{0.527 \pm 0.003}$ & $\mathbf{0.521 \pm 0.002}$
-                    & $\mathbf{0.525 \pm 0.002}$ & $\mathbf{0.520 \pm 0.001}$ \\
-    \textsc{Static} & $\mathbf{0.527 \pm 0.002}$ & $\mathbf{0.521 \pm 0.002}$
-                    & $\mathbf{0.525 \pm 0.002}$ & $\mathbf{0.520 \pm 0.002}$ \\
-    \textsc{Coevolve} & $\mathbf{0.527 \pm 0.002}$ & $\mathbf{0.521 \pm 0.002}$
-                      & $\mathbf{0.525 \pm 0.002}$ & $\mathbf{0.520 \pm 0.002}$ \\
+    Hillclimb       & $0.527 \pm 0.003$ & $0.521 \pm 0.002$
+                    & $0.525 \pm 0.002$ & $0.520 \pm 0.001$ \\
+    \textsc{Static} & $0.527 \pm 0.002$ & $0.521 \pm 0.002$
+                    & $0.525 \pm 0.002$ & $0.520 \pm 0.002$ \\
+    \textsc{Coevolve} & $0.527 \pm 0.002$ & $0.521 \pm 0.002$
+                      & $0.525 \pm 0.002$ & $0.520 \pm 0.002$ \\
     \bottomrule
   \end{tabular}
-\end{table}
+\end{table*}
 
 \begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{results_10/score_distributions.png}
-  \caption{Distribution of held-out uniform mean scores across 30 seeds
-    at $B = 10$. Box plots show median, IQR, and 1.5$\times$IQR whiskers;
-    individual seed scores are overlaid. The three optimized methods
-    (Hillclimb, \textsc{Static}, \textsc{Coevolve}) are
-    statistically indistinguishable from each other ($p \geq 0.98$,
-    Wilcoxon + Holm), while all significantly outperform Random and Baseline.}
-  \label{fig:score_dist}
+  \caption{Held-out score distributions at $B = 10$ ($n=30$ seeds). All the
+    optimized methods significantly outperform Random and Baseline.}
+  \label{fig:score_dist10}
 \end{figure}
 
-Fig.~\ref{fig:score_dist} shows the full score distributions at $B = 10$.
-The three optimized methods are statistically indistinguishable from one
-another: Wilcoxon $p \geq 0.98$ and $A_{12} \in [0.45, 0.54]$ for all
-pairwise comparisons (Table~\ref{tab:pairwise}). All three significantly
-outperform random search ($p < 10^{-7}$, $A_{12} \leq 0.07$) and the
-most-played baseline ($p < 1.5 \times 10^{-8}$, $A_{12} = 0.0$) meaning
-no baseline seed beats any optimized seed.
-
-\begin{table}[!t]
+\begin{figure}[!t]
   \centering
-  \caption{Pairwise comparison at $B = 10$ (held-out uniform mean score,
-    $n=30$ paired seeds). $p$-values are Holm-corrected Wilcoxon. $A_{12}$:
-    Vargha-Delaney effect size (row method vs.\ column method;
-    $> 0.5$ means row is better).
-    \cmark = significant at $\alpha = 0.05$.}
-  \label{tab:pairwise}
+  \includegraphics[width=\columnwidth]{results_25/score_distributions.png}
+  \caption{Held-out score distributions at $B = 25$ ($n=30$ seeds).
+    All optimized methods significantly outperform Random and Baseline.}
+  \label{fig:score_dist25}
+\end{figure}
+
+Fig.~\ref{fig:score_dist10} and Fig.~\ref{fig:score_dist25} show the full
+score distributions at $B = 10$ and $B = 25$, respectively. At both
+budget levels, the three optimized methods are statistically
+indistinguishable from one another: Wilcoxon $p \geq 0.98$ and
+$A_{12} \in [0.45, 0.54]$ at $B = 10$ (Table~\ref{tab:pairwise10}),
+and $p \geq 0.72$, $A_{12} \in [0.44, 0.48]$ at $B = 25$
+(Table~\ref{tab:pairwise25}). All three significantly outperform random
+search ($p < 10^{-7}$, $A_{12} \leq 0.07$) and the most-played baseline
+($p < 1.5 \times 10^{-8}$, $A_{12} = 0.0$) at both budgets, meaning no
+baseline seed beats any optimized seed.
+
+\begin{table*}[!t]
+  \centering
   \renewcommand{\arraystretch}{1.12}
-  \setlength{\tabcolsep}{3.5pt}
+  \setlength{\tabcolsep}{4pt}
   \small
-  \begin{tabular}{lcccc}
-    \toprule
-    \textbf{Method A vs.\ B} & \textbf{$\Delta$ mean} & \textbf{$p$-val} & \textbf{$A_{12}$} & \textbf{Sig.} \\
-    \midrule
-    Baseline vs.\ Random       & $-0.024$ & $<10^{-8}$ & 0.00 & \cmark \\
-    Baseline vs.\ Hillclimb    & $-0.029$ & $<10^{-8}$ & 0.00 & \cmark \\
-    Baseline vs.\ \textsc{Static}  & $-0.029$ & $<10^{-8}$ & 0.00 & \cmark \\
-    Baseline vs.\ \textsc{Coevolve}& $-0.029$ & $<10^{-8}$ & 0.00 & \cmark \\
-    Random vs.\ Hillclimb      & $-0.005$ & $<10^{-7}$ & 0.07 & \cmark \\
-    Random vs.\ \textsc{Static}    & $-0.005$ & $<10^{-8}$ & 0.06 & \cmark \\
-    Random vs.\ \textsc{Coevolve}  & $-0.005$ & $<10^{-8}$ & 0.03 & \cmark \\
-    Hillclimb vs.\ \textsc{Static} & $+0.000$ & $1.00$      & 0.54 & -- \\
-    Hillclimb vs.\ \textsc{Coevolve} & $-0.000$ & $0.98$    & 0.51 & -- \\
-    \textsc{Static} vs.\ \textsc{Coevolve} & $-0.000$ & $1.00$ & 0.45 & -- \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+  \begin{minipage}[t]{0.48\linewidth}
+    \centering
+    \caption{Pairwise statistical comparisons between all methods at $B = 10$.}
+    \label{tab:pairwise10}
+    \begin{tabular}{lcccc}
+      \toprule
+      \textbf{Method A vs.\ B} & \textbf{$\Delta$} & \textbf{$p$-val} & \textbf{$A_{12}$} & \textbf{Sig.} \\
+      \midrule
+      Baseline vs.\ Random         & $-0.024$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Baseline vs.\ Hillclimb      & $-0.029$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Baseline vs.\ \textsc{Static}    & $-0.029$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Baseline vs.\ \textsc{Coevolve}  & $-0.029$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Random vs.\ Hillclimb        & $-0.005$ & $<10^{-7}$ & 0.07 & \cmark \\
+      Random vs.\ \textsc{Static}      & $-0.005$ & $<10^{-8}$ & 0.06 & \cmark \\
+      Random vs.\ \textsc{Coevolve}    & $-0.005$ & $<10^{-8}$ & 0.03 & \cmark \\
+      Hillclimb vs.\ \textsc{Static}   & $+0.000$ & $1.00$     & 0.54 & -- \\
+      Hillclimb vs.\ \textsc{Coevolve} & $-0.000$ & $0.98$     & 0.51 & -- \\
+      \textsc{Static} vs.\ \textsc{Coevolve} & $-0.000$ & $1.00$ & 0.45 & -- \\
+      \bottomrule
+    \end{tabular}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.48\linewidth}
+    \centering
+    \caption{Pairwise statistical comparisons between all methods at $B = 25$.}
+    \label{tab:pairwise25}
+    \begin{tabular}{lcccc}
+      \toprule
+      \textbf{Method A vs.\ B} & \textbf{$\Delta$} & \textbf{$p$-val} & \textbf{$A_{12}$} & \textbf{Sig.} \\
+      \midrule
+      Baseline vs.\ Random         & $-0.026$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Baseline vs.\ Hillclimb      & $-0.033$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Baseline vs.\ \textsc{Static}    & $-0.033$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Baseline vs.\ \textsc{Coevolve}  & $-0.033$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Random vs.\ Hillclimb        & $-0.007$ & $<10^{-8}$ & 0.01 & \cmark \\
+      Random vs.\ \textsc{Static}      & $-0.007$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Random vs.\ \textsc{Coevolve}    & $-0.007$ & $<10^{-8}$ & 0.00 & \cmark \\
+      Hillclimb vs.\ \textsc{Static}   & $-0.000$ & $0.90$     & 0.45 & -- \\
+      Hillclimb vs.\ \textsc{Coevolve} & $-0.000$ & $1.00$     & 0.44 & -- \\
+      \textsc{Static} vs.\ \textsc{Coevolve} & $-0.000$ & $0.72$ & 0.48 & -- \\
+      \bottomrule
+    \end{tabular}
+  \end{minipage}
+\end{table*}
 
 \subsection{GA vs.\ Non-GA Baselines}
 
 \begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{results_10/ga_vs_nonga.png}
-  \caption{GA methods vs.\ non-GA baselines at $B = 10$.
-    Per-seed scores are shown; methods sorted by mean within groups.
-    Hillclimb reaches GA-level quality at ${\sim}1/35$ of
-    {\scshape Coevolve}'s runtime.}
-  \label{fig:ga_vs_nonga}
+  \caption{GA vs.\ non-GA baselines at $B = 10$ (per-seed scores).}
+  \label{fig:ga_vs_nonga10}
 \end{figure}
 
-The key takeaway from Fig.~\ref{fig:ga_vs_nonga} is that the greedy
-hillclimber matches both GA methods in final quality, with tighter spread
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\columnwidth]{results_25/ga_vs_nonga.png}
+  \caption{GA vs.\ non-GA baselines at $B = 25$ (per-seed scores).}
+  \label{fig:ga_vs_nonga25}
+\end{figure}
+
+The key takeaway from Fig.~\ref{fig:ga_vs_nonga10} and
+Fig.~\ref{fig:ga_vs_nonga25} is that the greedy hillclimber matches both
+GA methods in final quality at both budget conditions, with tighter spread
 at $B = 10$. It is not a sophisticated algorithm, just steepest-ascent
 mutations from a greedy initialization, yet it finds solutions that neither
 GA variant can improve upon. Random search, which samples 10,000 candidates
-without structure, is significantly worse than all three, confirming that
-directed local exploration pays off on this landscape.
+without structure, is significantly worse than all three, proving that focusing
+on small, local changes is a successful strategy for this task, whether you 
+have a 10-move or a 25-move budget.
 
 \subsection{Closure Ablation}
 
 \begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{results_10/closure_ablation.png}
-  \caption{Closure ON vs.\ OFF at $B = 10$, for \textsc{Static} and
-    \textsc{Coevolve}. Each point is one seed. Closure consistently
-    improves every seed: $A_{12} = 1.0$ in all four comparisons.}
-  \label{fig:closure}
+  \caption{Closure ON vs.\ OFF at $B = 10$.}
+  \label{fig:closure10}
 \end{figure}
 
-\begin{table}[!t]
+\begin{figure}[!t]
   \centering
-  \caption{Closure ablation results (held-out uniform mean and worst-band
-    scores). $\Delta = $ score with closure $-$ score without.
-    All comparisons: Wilcoxon $p < 7.5 \times 10^{-9}$, $A_{12} = 1.0$
-    (perfect effect size, $n = 30$ paired seeds).}
+  \includegraphics[width=\columnwidth]{results_25/closure_ablation.png}
+  \caption{Closure ON vs.\ OFF at $B = 25$.}
+  \label{fig:closure25}
+\end{figure}
+
+\begin{table*}[!t]
+  \centering
+  \caption{Effect of the closure rule on held-out scores at both budget levels ($n=30$ seeds).}
   \label{tab:closure}
   \renewcommand{\arraystretch}{1.12}
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{llccc}
+  \setlength{\tabcolsep}{6pt}
+  \small
+  \begin{tabular}{llllccc}
     \toprule
-    \textbf{Metric} & \textbf{Method} & \textbf{With} & \textbf{Without} & \textbf{$\Delta$} \\
+    \textbf{Budget} & \textbf{Metric} & \textbf{Method} & \textbf{With} & \textbf{Without} & \textbf{$\Delta$} \\
     \midrule
-    \multirow{2}{*}{Unif.\ mean}
-      & \textsc{Static}   & 0.5269 & 0.5037 & $+0.0232$ \\
-      & \textsc{Coevolve} & 0.5272 & 0.5037 & $+0.0235$ \\
+    \multirow{4}{*}{$B=10$}
+      & \multirow{2}{*}{Unif.\ mean}
+        & \textsc{Static}   & 0.5269 & 0.5037 & $+0.0232$ \\
+      & & \textsc{Coevolve} & 0.5272 & 0.5037 & $+0.0235$ \\
+      \cmidrule(l){2-6}
+      & \multirow{2}{*}{Worst band}
+        & \textsc{Static}   & 0.5209 & 0.5023 & $+0.0187$ \\
+      & & \textsc{Coevolve} & 0.5211 & 0.5023 & $+0.0188$ \\
     \midrule
-    \multirow{2}{*}{Worst band}
-      & \textsc{Static}   & 0.5209 & 0.5023 & $+0.0187$ \\
-      & \textsc{Coevolve} & 0.5211 & 0.5023 & $+0.0188$ \\
+    \multirow{4}{*}{$B=25$}
+      & \multirow{2}{*}{Unif.\ mean}
+        & \textsc{Static}   & 0.5252 & 0.5037 & $+0.0215$ \\
+      & & \textsc{Coevolve} & 0.5252 & 0.5037 & $+0.0215$ \\
+      \cmidrule(l){2-6}
+      & \multirow{2}{*}{Worst band}
+        & \textsc{Static}   & 0.5200 & 0.5023 & $+0.0178$ \\
+      & & \textsc{Coevolve} & 0.5201 & 0.5023 & $+0.0178$ \\
     \bottomrule
   \end{tabular}
-\end{table}
+\end{table*}
 
-The closure rule turns out to be the single most important component of
-the system. Removing it drops mean score by 2.3~pp at $B = 10$ (2.15~pp
-at $B = 25$), with $A_{12} = 1.0$: every one of the 30 seeds performs
-worse without the rule, no exceptions (Table~\ref{tab:closure},
-Fig.~\ref{fig:closure}). Worst-band score drops by 1.9~pp as well,
-confirming that closure improves robustness, not just average performance.
-The statistical evidence is unambiguous: Wilcoxon $p < 7.5 \times 10^{-9}$
-with Holm correction. Notably, both \textsc{Static} and \textsc{Coevolve}
-converge to the same no-closure score of $0.5037$, suggesting the
-unconstrained landscape has a dominant basin that the GA locates quickly
-regardless of variant.
+The closure rule turns out to be the most important component of
+the system. Removing it drops mean score by 0.023 at $B = 10$ and
+0.0215 at $B = 25$, with $A_{12} = 1.0$ in all cases: every one of the
+30 seeds performs worse without the rule, no exceptions
+(Table~\ref{tab:closure}, Fig.~\ref{fig:closure10},
+Fig.~\ref{fig:closure25}). Worst-band score drops by 0.019 at $B = 10$
+and 0.018 at $B = 25$, confirming that closure improves robustness, not
+just average performance, and that this benefit is consistent across both
+budget conditions. The statistical evidence is unambiguous: Wilcoxon
+$p < 7.5 \times 10^{-9}$ with Holm correction. Notably, both
+\textsc{Static} and \textsc{Coevolve} converge to the same no-closure
+score of $0.5037$, suggesting the unconstrained landscape has a dominant
+basin that the GA locates quickly regardless of variant.
 
 \subsection{Robustness Across Rating Bands}
 
 \begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{results_10/band_breakdown.png}
-  \caption{Per-band scores at $B = 10$. The three rating bands show
-    meaningfully different score profiles, confirming that optimizing
-    for robustness across bands is non-trivial.}
+  \caption{Per-band held-out scores at $B = 10$.}
   \label{fig:band10}
 \end{figure}
 
 \begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{results_25/band_breakdown.png}
-  \caption{Per-band scores at $B = 25$. The three rating bands show
-    meaningfully different score profiles, confirming that optimizing
-    for robustness across bands is non-trivial.}
+  \caption{Per-band held-out scores at $B = 25$.}
   \label{fig:band25}
 \end{figure}
 
-Fig.~\ref{fig:band10} and Fig.~\ref{fig:band25}  reveals why a mean-only objective would be
+Fig.~\ref{fig:band10} and Fig.~\ref{fig:band25} reveal why a mean-only objective would be
 insufficient: the three rating bands show meaningfully different score
-profiles, with gaps of several percentage points between them. A repertoire
+profiles, with score gaps of up to $0.03$ between bands. A repertoire
 that performs well against mid-range players does not automatically hold up
 against beginners or advanced opponents. The CVaR term in the fitness
 explicitly penalizes this variation. In practice, all optimized methods
@@ -709,76 +672,95 @@ the uniform mean closely (Table~\ref{tab:main}).
 
 \begin{figure}[!t]
   \centering
-  \includegraphics[width=\columnwidth]{results_25/convergence.png}
-  \caption{Training fitness over 100 generations at $B = 25$, across
-    30 seeds (mean $\pm$ 95\% CI). \textsc{Coevolve} shows slightly
-    higher initial variance due to opponent adaptation; all methods
-    converge by approximately generation 30.}
-  \label{fig:conv}
+  \includegraphics[width=\columnwidth]{results_10/convergence.png}
+  \caption{Training fitness over 100 generations at $B = 10$ (mean $\pm$ 95\% CI,
+    $n=30$ seeds).}
+  \label{fig:conv10}
 \end{figure}
 
-Fig.~\ref{fig:conv} shows training fitness over 100 generations at
-$B = 25$. Both {\scshape Static} and {\scshape Coevolve} improve rapidly
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\columnwidth]{results_25/convergence.png}
+  \caption{Training fitness over 100 generations at $B = 25$ (mean $\pm$ 95\% CI,
+    $n=30$ seeds). }
+  \label{fig:conv25}
+\end{figure}
+
+Fig.~\ref{fig:conv10} and Fig.~\ref{fig:conv25} show training fitness
+over 100 generations at $B = 10$ and $B = 25$, respectively. At both
+budget levels, {\scshape Static} and {\scshape Coevolve} improve rapidly
 in the first 30 generations, then plateau. Their 95\% confidence intervals
-overlap throughout the entire run---co-evolution provides neither a faster
-trajectory nor a higher ceiling. The diversity reinitialization mechanism
-keeps the population from converging prematurely; mean pairwise Jaccard
-distance settles at roughly $0.35$--$0.40$ in later generations
-(visible in Fig.~\ref{fig:dyn}).
+overlap throughout the entire run, co-evolution provides neither a faster
+trajectory nor a higher ceiling at either budget. The diversity
+reinitialization mechanism keeps the population from converging
+prematurely; mean pairwise Jaccard distance settles at roughly
+$0.35$ -- $0.40$ in later generations (visible in
+Fig.~\ref{fig:dyn10} and Fig.~\ref{fig:dyn25}).
 
 \subsection{Coevolution Dynamics}
 
 \begin{figure}[!t]
   \centering
-  \includegraphics[width=\columnwidth]{results_25/coevolve_dynamics.png}
-  \caption{{\scshape Coevolve} population dynamics at $B = 25$ over
-    100 generations (mean across 30 seeds). \emph{Top}: training
-    fitness. \emph{Middle}: repertoire diversity (mean pairwise Jaccard).
-    \emph{Bottom}: opponent diversity (mean pairwise $\ell_2$). The Hall
-    of Fame reaches capacity ($k=10$) immediately and remains constant;
-    opponent diversity stabilizes at ${\approx}0.28$ after ${\sim}10$ generations.}
-  \label{fig:dyn}
+  \includegraphics[width=\columnwidth]{results_10/coevolve_dynamics.png}
+  \caption{{\scshape Coevolve} dynamics at $B = 10$ ($n=30$ seeds):
+    training fitness (a), repertoire diversity (b), opponent diversity (c).}
+  \label{fig:dyn10}
 \end{figure}
-
-Fig.~\ref{fig:dyn} tracks three aspects of co-evolutionary behavior at
-$B = 25$. Repertoire diversity begins high ($\approx 0.86$ mean pairwise
-Jaccard) and settles around $0.35$ by generation 25, with occasional spikes
-from diversity reinitialization. Opponent diversity stabilizes quickly at
-$\approx 0.28$ after about 10 generations, showing that the opponent
-population does maintain a spread of strategies. The Hall of Fame fills to
-its full capacity of 10 opponents by generation 0 and stays there---diverse,
-informative opponents are available from the very start. Yet despite all
-this adaptive machinery, the repertoire fitness trajectory is
-indistinguishable from {\scshape Static}, which explains the null result
-in Table~\ref{tab:pairwise}.
-
-\subsection{Example Repertoire}
 
 \begin{figure}[!t]
   \centering
-  \includegraphics[width=\columnwidth]{results_25/repertoire_graph_COEVOLVE.png}
-  \caption{Best {\scshape Coevolve} repertoire at $B = 25$ (seed 1008),
-    visualized as a decision graph. Our-color committed moves are shown
-    as filled nodes; opponent responses appear as branching edges.
-    The repertoire covers major opening families including the Queen's
-    Gambit, Gr\"unfeld Defense, Sicilian Defense, Benoni, and Caro-Kann.}
-  \label{fig:repgraph}
+  \includegraphics[width=\columnwidth]{results_25/coevolve_dynamics.png}
+  \caption{{\scshape Coevolve} dynamics at $B = 25$ ($n=30$ seeds):
+    training fitness (a), repertoire diversity (b), opponent diversity (c).}
+  \label{fig:dyn25}
 \end{figure}
 
+Fig.~\ref{fig:dyn10} and Fig.~\ref{fig:dyn25} track three aspects of
+co-evolutionary behavior at $B = 10$ and $B = 25$. Repertoire diversity
+begins high ($\approx 0.86$ mean pairwise Jaccard) and settles around
+$0.35$ by generation 25, with occasional spikes from diversity
+reinitialization, at both budget levels. Opponent diversity stabilizes
+quickly at $\approx 0.28$ after about 10 generations, showing that the
+opponent population does maintain a slight spread of strategies. The Hall of Fame
+fills to its full capacity of 10 opponents by generation 0 and stays
+there, diverse, informative opponents are available from the very start.
+Yet despite all this adaptive machinery, the repertoire fitness trajectory
+is indistinguishable from {\scshape Static} at both budgets, which explains
+the null result in Table~\ref{tab:pairwise10} and
+Table~\ref{tab:pairwise25}.
+
+\subsection{Example Repertoire}
+
+\begin{figure*}[!t]
+  \centering
+  \includegraphics[width=\textwidth]{results_10/repertoire_sankey_COEVOLVE.png}
+  \caption{Best \textsc{Coevolve} repertoire at $B = 10$, visualized as a Sankey diagram. 
+  Blue boxes represent committed moves; gray flows represent opponent responses. 
+  (a) As White, the model opens 1.d4, committing to the Queen's Gambit (2.c4) 
+  against 1...d5 and the Jobava London System (2.Nc3) against 1...Nf6. (b) As Black,
+  the model meets 1.e4 with the Sicilian Defense (1...c5) and responds to 1.d4 with
+  1...Nf6, adopting King's Indian-style structures (g6, Bg7) or Benoni-style counters
+  (c5) based on White's continuation.}
+  \label{fig:repgraph}
+\end{figure*}
+
 Fig.~\ref{fig:repgraph} shows a concrete example of what an optimized
-repertoire looks like. The effect of the closure rule is visible in the
-structure: at key decision points the tree branches to cover multiple
-opponent continuations rather than committing to a single line. The
-repertoire commits 21 moves as White and 24 as Black, nearly exhausting
-the budget of 25, and spans major opening families including the Queen's
-Gambit, Gr\"unfeld, Sicilian, Benoni, and Caro-Kann.
+repertoire looks like at $B = 10$. The Sankey layout makes the effect of the
+closure rule immediately visible: at every opponent-turn node, the gray flows
+fan out to cover all replies above the 15\% threshold, and a committed move
+(blue) is required for each. White commits to 1.d4 and follows with Queen's Gambit continuations (2.c4)
+against 1...d5 and the Jobava London System (2.Nc3) against 1...Nf6.
+Black meets 1.e4 with the Sicilian Defense (1...c5) and responds to 1.d4
+with 1...Nf6, adopting King's Indian-style structures (g6, Bg7) or
+Benoni-style counters (c5) depending on White's continuation. The budget of 10 moves per color is nearly exhausted,
+confirming that the closure constraint forces the algorithm to make full use
+of the available budget to maintain coverage.
 
 \subsection{Computational Cost}
 
 \begin{table}[!t]
   \centering
-  \caption{Wall-clock runtime (mean $\pm$ std, $n=30$ seeds).
-    Evaluation budget: 6,000 fitness evaluations for all methods.}
+  \caption{Wall-clock runtime for all methods at both budget levels ($n=30$ seeds).}
   \label{tab:runtime}
   \renewcommand{\arraystretch}{1.12}
   \setlength{\tabcolsep}{4pt}
@@ -800,7 +782,10 @@ The runtime differences between methods are stark (Table~\ref{tab:runtime}).
 $B = 10$ and $11\times$ longer at $B = 25$, yet produces no measurable
 improvement in held-out score. The greedy hillclimber is the clear
 efficiency winner, reaching {\scshape Static}-equivalent quality in just
-$1.0$~s at $B = 10$.
+$1.0$~s at $B = 10$. The high standard deviation for {\scshape Static} at
+$B = 25$ ($\pm 129.1$~s) reflects variable tree sizes across seeds: some
+seeds encounter denser opening branches that require substantially more
+evaluation time.
 
 
 % =========================================================================
@@ -808,26 +793,26 @@ $1.0$~s at $B = 10$.
 \section{Discussion}
 
 \subsection{The Closure Rule Is the Decisive Contribution}
-The most important takeaway from this work is not the GA but the closure rule. Removing it drops held-out performance by 2.3~pp with perfect effect
+The most important takeaway from this work is not the GA but the closure rule. Removing it drops held-out performance by $0.023$ with perfect effect
 size ($A_{12} = 1.0$, $p < 7.5 \times 10^{-9}$), meaning every single seed
 across all 30 runs performs worse without it, across both GA variants and
 both budget conditions. The closure rule enforces what we call adversarial completeness: the repertoire must handle all likely
 opponent replies, not just the single most popular continuation. Without this constraint, the GA exploits the freedom to ignore inconvenient branches, producing repertoires that score well on training data but fail in practice as soon as an opponent plays a common alternative.
 
 \subsection{Co-Evolution Adds No Benefit Over a Static Opponent}
-{\scshape CoEvolve} was designed with principled co-evolutionary machinery:
+\textsc{Coevolve} was designed with principled co-evolutionary machinery:
 adaptive opponent populations, novelty-driven fitness, and a Hall of Fame
 for evaluation stability. Yet it provides no statistically significant
 benefit over {\scshape Static} ($p = 1.0$, $A_{12} = 0.45$) at $35\times$
 the computational cost. The most likely explanation is that the opponent
-search space, a 3-simplex over three rating bands, is simply too
+search space, a 2-simplex over three rating bands, is simply too
 low-dimensional to generate meaningful adversarial pressure. The uniform mixture already captures most of the signal, leaving no useful gradient for
 co-evolution to exploit. A richer opponent model, such as per-position move policies that vary by playing style rather than just rating, might create
 enough adversarial diversity for co-evolution to pay off.
 
 \subsection{The Fitness Landscape Favours Simple Local Search}
 The greedy hill-climber matches both GA variants in final held-out quality
-at roughly $1/90$ of {\scshape CoEvolve}'s runtime at $B = 10$. This
+at roughly $1/90$ of \textsc{Coevolve}'s runtime at $B = 10$. This
 strongly suggests that the closure-constrained fitness landscape is largely
 unimodal, or at least contains a dominant basin of attraction that a simple
 local-search procedure can reach. At the scales tested here, maintaining a
@@ -836,7 +821,7 @@ benefit over a single trajectory of steepest-ascent mutations.
 
 \subsection{A Tighter Budget Does Not Hurt Performance}
 The smaller budget slightly outperforms the larger one (0.5272 vs.\ 0.5252
-for {\scshape CoEvolve}), which at first seems counter-intuitive. A tighter
+for \textsc{Coevolve}), which at first seems counter-intuitive. A tighter
 budget forces the algorithm to commit only to the highest-value moves, while
 a larger budget may fill remaining space with marginal lines that dilute
 overall quality. An alternative explanation is that $B = 25$ evaluations are
@@ -853,14 +838,14 @@ point directly to the most promising areas for future work.
 
 \section{Conclusion}
 
-We presented a model for automatically constructing robust chess opening repertoires under a memorization budget, combining a genetic algorithm with a closure rule evaluated on real Lichess game data. The central finding is that the closure rule, which requires the repertoire to cover all opponent replies played in at least 15\% of observed games, accounts for the bulk of the performance gain. It yields $+2.3$~pp in held-out expected score with Vargha–Delaney effect size ($A_{12} = 1.0$) across all 30 seeds and both budget conditions, confirming that adversarial completeness is the
+We presented a model for automatically constructing robust chess opening repertoires under a memorization budget, combining a genetic algorithm with a closure rule evaluated on real Lichess game data. The central finding is that the closure rule, which requires the repertoire to cover all opponent replies played in at least 15\% of observed games, accounts for the bulk of the performance gain. It yields $+0.023$ in held-out expected score with Vargha–Delaney effect size ($A_{12} = 1.0$) across all 30 seeds and both budget conditions, confirming that adversarial completeness is the
 essential ingredient for practical robustness.
 
 The co-evolutionary component, despite its principled design, adds no
 measurable benefit over a static opponent ($p = 1.0$, $A_{12} = 0.45$),
-with the likely cause being that a 3-simplex opponent space is too restricted
+with the likely cause being that a 2-simplex opponent space is too restricted
 to generate exploitable adversarial pressure. More strikingly, a greedy
-hill-climber matches GA-level quality at $\sim$1/90 of {\scshape CoEvolve}'s
+hill-climber matches GA-level quality at $\sim$1/90 of \textsc{Coevolve}'s
 runtime, indicating the closure-constrained landscape is well-suited to
 simple local search, and that population-based search offers diminishing returns at the scales tested.
 
@@ -871,7 +856,7 @@ The closure rule can be applied to any adversarial problem where preparation mus
 \label{sec:future}
 
 \subsection{Richer Opponent Models for Meaningful Co-Evolutionary Pressure}
-The 3-simplex opponent space is too constrained to expose meaningful
+The 2-simplex opponent space is too constrained to expose meaningful
 adversarial diversity. We can replace the band weights with per-position move policies that capture individual playing style which would provide a far more expressive adversarial signal.
 
 \subsection{Deeper Position Graphs}
@@ -890,49 +875,7 @@ This work was completed as part of the Computational Intelligence
 (CS~462) course, Spring 2026, Habib University, Karachi, Pakistan. Opening data is sourced from the Lichess Opening Explorer API under the Creative Commons Attribution 4.0 license.
 
 % =========================================================================
-\begin{thebibliography}{9}
-
-\bibitem{rosin1997}
-    C.~D. Rosin and R.~K. Belew, ``New methods for competitive coevolution,''
-    \textit{Evolutionary Computation}, vol.~5, no.~1, pp.~1--29, 1997.
-
-\bibitem{fogel2004}
-    D.~B. Fogel, ``A self-learning evolutionary chess program,''
-    \textit{Proc. IEEE}, vol.~92, no.~12, pp.~1947--1964, Dec. 2004.
-
-\bibitem{ramos2016}
-    N.~Ramos, S.~Salgado, and A.~C. Rosa, ``Chess player by co-evolutionary
-    algorithm,'' arXiv preprint arXiv:1605.06710, May 2016.
-
-\bibitem{hillis1990}
-    W.~D. Hillis, ``Co-evolving parasites improve simulated evolution as an
-    optimization procedure,'' \textit{Physica D: Nonlinear Phenomena},
-    vol.~42, no.~1--3, pp.~228--234, 1990.
-
-\bibitem{walczak1996}
-    S.~Walczak, ``Improving opening book performance through modeling of chess
-    opponents,'' in \textit{Proc. ACM 24th Annu. Conf. Computer Science
-    (CSC'96)}, Philadelphia, PA, USA, Feb. 1996, pp.~53--57.
-
-\bibitem{marzo2023}
-    G.~De Marzo and V.~D.~P. Servedio, ``Quantifying the complexity and
-    similarity of chess openings using online chess community data,''
-    \textit{Scientific Reports}, vol.~13, no.~1, p.~5327, Apr. 2023.
-
-\bibitem{lehman2011}
-    J.~Lehman and K.~O. Stanley, ``Abandoning objectives: Evolution through
-    the search for novelty alone,'' \textit{Evolutionary Computation},
-    vol.~19, no.~2, pp.~189--223, 2011.
-
-\bibitem{rockafellar2000}
-    R.~T. Rockafellar and S.~Uryasev, ``Optimization of conditional
-    value-at-risk,'' \textit{Journal of Risk}, vol.~2, no.~3, pp.~21--41,
-    2000.
-
-\bibitem{lichess}
-    Lichess.org, ``Lichess Opening Explorer API,'' 2025. [Online]. Available:
-    \url{https://lichess.org/api}
-
-\end{thebibliography}
+\bibliographystyle{IEEEtran}
+\bibliography{references}
 
 \end{document}
