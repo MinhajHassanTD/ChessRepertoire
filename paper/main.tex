@@ -21,141 +21,100 @@
 
 \begin{document}
 
-\title{Robust Chess Opening Repertoire Optimization via\\
-Co-Evolutionary Genetic Algorithms and a Closure Constraint}
+\title{Co-Evolutionary Genetic Algorithms for Memorization-Constrained Robust Chess Opening Repertoires}
 
-\author{\IEEEauthorblockN{Minhaj ul Hassan}
-\IEEEauthorblockA{\textit{Department of Computer Science} \\
-\textit{Habib University}\\
-Karachi, Pakistan \\
-mu08984@st.habib.edu.pk}
-\and
-\IEEEauthorblockN{Zainab Zahid}
-\IEEEauthorblockA{\textit{Department of Computer Science} \\
-\textit{Habib University}\\
-Karachi, Pakistan \\
-zz08969@st.habib.edu.pk}
-\and
-\IEEEauthorblockN{Hazeera Muhammad Hashim}
-\IEEEauthorblockA{\textit{Department of Computer Science} \\
-\textit{Habib University}\\
-Karachi, Pakistan \\
-hm09247@st.habib.edu.pk}
+\author{
+    \IEEEauthorblockN{Hazeera Muhammad Hashim, Minhaj ul Hassan, and Zainab Zahid}
+    \IEEEauthorblockA{\textit{Department of Computer Science, Habib University}}
+    Karachi, Pakistan \\
+    \texttt{\{hm09247, mu08984, zz08969\}@std.habib.edu.pk}
 }
 
 \maketitle
 
 % -------------------------------------------------------------------------
 \begin{abstract}
-Building a chess opening repertoire means pre-memorizing a compact set of
-moves that hold up against a variety of opponents. Current tools handle this
-greedily---selecting moves by frequency or win rate---without jointly
-optimizing for robustness across skill levels or ensuring the repertoire
-covers all dangerous opponent replies. We formalize the task as constructing
-a budget-constrained subgraph of a chess position graph built from Lichess
-rapid and classical games, and introduce a \emph{closure rule}: at every
-position where the opponent moves, all replies played in at least 15\% of
-observed games must be covered. A CVaR-weighted fitness objective across
-three rating bands (1000--1399, 1400--1799, 1800--2199) rewards both mean
-performance and robustness against the worst-case opponent skill level. We
-optimize this using a co-evolutionary genetic algorithm ({\scshape Coevolve}),
-which co-adapts a population of opponent strategies alongside the repertoire
-population, and compare it against a static GA ({\scshape Static}), a greedy
-hillclimber, random search, and a most-played heuristic. Across 30 independent
-seeds and two budget conditions ($B \in \{10, 25\}$ committed moves per color),
-the closure rule is the dominant factor: it yields a consistent +2.3
-percentage-point improvement in held-out expected score with perfect effect
-size ($A_{12} = 1.0$, $p < 7.5 \times 10^{-9}$, Wilcoxon signed-rank with
-Holm correction), and every single seed performs better with the rule than
-without it. Co-evolution, by contrast, offers no statistically significant
-benefit over the static GA ($p = 1.0$, $A_{12} = 0.45$) at 35$\times$ the
-computational cost. A greedy hillclimber matches GA-quality solutions at a
-fraction of the runtime, suggesting the closure-constrained fitness landscape
-responds well to local search.
+This paper studies whether a novel closure rule, optimized via Genetic Algorithm (GA) or local search techniques, improves the robustness of chess opening repertoires across varying opponent skill levels. The repertoire is memorization-constrained, retaining a budget of $\mathcal{B}$ moves per color, and must cover all opponent replies played in at least 15\% of observed Lichess games at any reached position (closure-constrained). We compare five methodologies over 30 independent seeds: a most-played heuristic baseline, random search, a greedy hillclimber, a standard GA (\textsc{Static}), and a co-evolutionary GA (\textsc{Coevolve}) where the repertoire and opponent populations evolve together. A CVaR-weighted fitness objective was applied; held-out evaluation always measures the expected score across three rating bands (1000--1399, 1400--1799, 1800--2199) to reward both mean performance and worst-case robustness. The closure rule emerges as the dominant factor, yielding a consistent +2.3 percentage-point improvement in held-out expected score with a perfect effect size ($A_{12} = 1.0$, $p < 7.5 \times 10^{-9}$), while \textsc{Coevolve} offers no statistically significant benefit over \textsc{Static} ($A_{12}=0.45$, $p=1.0$) despite a 35$\times$ computational cost. Furthermore, the greedy hillclimber matches GA-quality solutions at a fraction of the runtime, suggesting the closure-constrained fitness landscape responds well to local search.
 \end{abstract}
 
 \begin{IEEEkeywords}
-chess, opening repertoire, genetic algorithm, co-evolutionary computation,
-CVaR, robust optimization, Lichess
+chess, co-evolutionary, constrained combinatorial optimization, genetic algorithm, opening repertoire 
 \end{IEEEkeywords}
 
 
 % =========================================================================
 \section{Introduction}
 
-Chess opening preparation is a central part of competitive play at every
-level. A player needs to select a compact \emph{repertoire}---a set of
-preferred responses for both colors---that holds up against the range of
-opponents they are likely to face. This is an optimization problem under
-constraints: the player has limited memorization capacity, must anticipate
-a distribution of opponent responses, and ideally should perform well
-across skill levels rather than against just one type of player.
-
-Current computer-aided tools---including Lichess Opening Explorer
-\cite{lichess}, SCID, and ChessBase---let players browse game databases
-and pick moves by frequency or win rate. These tools are useful but
-limited: they do not jointly optimize a global repertoire objective, they
-do not ensure coverage of dangerous opponent replies, and they do not
-account for how opponent behavior shifts with skill level.
-
-What makes this problem genuinely hard is the scale of the search space.
-A database of real games exposes hundreds of distinct positions, and
-combining them into a coherent repertoire---one that covers all critical
-opponent replies without wasting the memorization budget on marginal
-lines---involves a combinatorial search that is neither convex nor
-continuous. Picking lines purely by win rate ignores coverage gaps and
-the fact that different skill levels play very differently. Moreover, what
-makes a repertoire ``good'' is not fixed: lines that work against a
-positional player can fail against an aggressive one, and a repertoire
-tuned for average performance can hide systematic weaknesses that overall
-statistics simply obscure.
-
-This paper presents a fully automated system for repertoire optimization.
-Given millions of Lichess games organized by rating band, the system builds
-a position graph, computes per-band move statistics, and uses a genetic
-algorithm to find a compact opening repertoire. A genetic algorithm is
-particularly well suited here: the repertoire space is discrete and
-non-convex, changing one committed move can cascade through the tree, and
-gradient methods do not apply to move choices. A population of candidates
-explores the space in parallel; a co-evolving opponent population provides
-adaptive adversarial pressure at no extra architectural cost. The central
-design choice is the \textbf{closure rule}: at every position where the
-opponent moves, all replies played in at least $\theta = 0.15$ of observed
-games must be covered. This forces the system to handle the most likely
-opponent continuations rather than cherry-picking only the best-case lines.
-
-We propose two GA variants. {\scshape Static} evaluates repertoires against
-a fixed, uniform mix of all three rating bands. {\scshape Coevolve} goes
-further, maintaining a co-evolving population of opponent strategies that
-adapts to challenge the current repertoire population, guided by both
-performance and novelty. We compare both variants against a greedy
-hillclimber, random search, and a most-played heuristic at a matched
-evaluation budget.
-
-\textbf{Contributions:}
-\begin{enumerate}
-  \item A formal repertoire model defined as a budget-constrained subgraph
-        of the chess position graph, with a closure rule and a CVaR-robust
-        fitness function that rewards robustness across opponent skill levels.
-  \item A co-evolutionary GA with adaptive opponent modeling, novelty-driven
-        opponent fitness, and a Hall of Fame of informative opponents.
-  \item Controlled evaluation over 30 seeds and two budget conditions, using
-        Wilcoxon signed-rank tests and Vargha-Delaney $A_{12}$ effect sizes.
-\end{enumerate}
-
-\textbf{Main findings:} The closure rule is the decisive contribution
-(+2.3~pp, $A_{12} = 1.0$). Co-evolution adds no measurable benefit over
-the static GA ($p = 1.0$, $A_{12} = 0.45$) at 35$\times$ the computational
-cost. The greedy hillclimber matches both GA variants and offers the best
-accuracy-to-cost tradeoff.
+Chess opening preparation can be fundamentally modeled as an optimization
+    problem under constraints. An opening repertoire is a compact set of
+    preferred responses for both colors that a player selects to hold up against
+    a range of opponents. Each move played has successive resulting moves that
+    could be played by the opponent in response, requiring the player to
+    anticipate a varied distribution of opponent behaviors. A player can at most
+    memorize a limited capacity of moves to prepare beforehand. Hence, for players
+    picking the right set of opening lines is a real and practical challenge
+    that must perform well across skill levels rather than against just one type
+    of player. The problem centers on the discrete, non-convex search space of
+    the moves and their responses, and the finite memorization budget a player
+    possesses. This makes opening preparation an instance of constrained
+    combinatorial optimization across shifting opponent skill levels.
+    
+    What makes this hard is the sheer scale of the search space. A database
+    built from real Lichess games exposes hundreds of distinct positions.
+    Picking lines that together cover all critical opponent replies, without
+    wasting the memorization budget on marginal lines, involves a combinatorial
+    search that is neither convex nor continuous. Simply relying on current
+    computer-aided tools, such as Lichess Opening Explorer, SCID, and ChessBase,
+    is insufficient as they do not jointly optimize a global repertoire objective.
+    Using the lines with the highest frequencies or win rates ignores coverage
+    gaps and the fact that different skill levels play very differently. Relying
+    on these standard tools fails to guarantee the coverage of dangerous
+    opponent replies or account for how opponent behavior shifts with skill
+    level. Moreover, what makes a repertoire ``good'' is not fixed: lines that
+    work well against a positional opponent might fail against an aggressive
+    player, and a repertoire tuned to perform well on average can hide systematic
+    weaknesses that overall statistics simply obscure.
+    
+    We treat the problem as \emph{robust constrained optimization}, defined
+    formally as extracting a budget-constrained subgraph of the chess position
+    graph where the system must handle the most likely opponent continuations.
+    % The key mechanisms are: (i)~a memorization budget condition of 10 or 25
+    % committed moves per color; (ii)~a closure rule forcing coverage of all
+    % opponent replies played in ${\geq}15\%$ of observed games at any reached
+    % position; (iii)~a CVaR-robust fitness function rewarding both mean
+    % performance and robustness against the worst-case opponent skill level;
+    % (iv)~three rating bands (1000--1399, 1400--1799, 1800--2199); and (v)~the
+    % use of a genetic algorithm (GA) to navigate a space where gradient methods
+    % do not apply and changing one committed move cascades through the tree. 
+    Repertoires are selected from millions of Lichess rapid and classical games
+    organized by rating band, with per-band move statistics computed for each
+    node. Fitness is optimized through a population of candidates exploring the
+    space in parallel, with controlled evaluation conducted over 30 independent
+    seeds. Comparisons are made at a matched evaluation budget using Wilcoxon
+    signed-rank tests and Vargha-Delaney effect sizes, identifying the closure
+    rule as a decisive factor yielding a perfect effect size ($A_{12} = 1.0$,
+    $p < 7.5 \times 10^{-9}$) and a +2.3 percentage-point improvement.
+    
+    The central design question is what opponent model to train against. A
+    standard GA ({\scshape Static}) evaluates against a fixed, uniform mix of
+    all three rating bands. A co-evolutionary model ({\scshape Coevolve}) lets
+    a population of opponent strategies adapt and evolve alongside the repertoire
+    population, guided by performance, novelty, and a Hall of Fame of informative
+    opponents. We ask which methodology yields optimal results: static evolution,
+    adversarial co-evolution, random search, a most-played heuristic, or a greedy
+    hillclimber. 
+    We implemented the fully automated system and found that
+    co-evolution adds no measurable benefit over the static GA ($p = 1.0$,
+    $A_{12} = 0.45$) despite a 35$\times$ computational cost, while the greedy
+    hillclimber matches GA-quality solutions, suggesting the closure-constrained
+    landscape offers the best accuracy-to-cost tradeoff via local search.
 
 
 % =========================================================================
 \section{Related Work}
-
-\textbf{Chess databases and opening book tools.}
+\subsection{Chess databases and opening book tools.}
 Walczak~\cite{walczak1996} showed that adapting an opening book to model
-opponent style produces measurable improvements---an early indication that
+opponent style produces measurable improvements, an early indication that
 opponent-awareness matters in opening preparation. Fogel~\cite{fogel2004}
 applied neuroevolution to train a self-learning chess evaluation function,
 establishing evolutionary computation as a viable approach to chess-specific
@@ -164,31 +123,33 @@ large-scale Lichess data and found statistically significant differences in
 move preferences across rating bands, which directly motivates our per-band
 fitness formulation.
 
-\textbf{Co-evolutionary algorithms.}
+\subsection{Self-Learning Evolutionary Chess Programs}
+    
+    Fogel et al.~\cite{fogel2004} present a chess engine that evolves its
+    evaluation parameters, material values, a positional value table, and
+    neural networks, using GA through random mutation and competitive parent
+    selection. Their player Blondie25 attained a performance rating of around
+    2550 under tournament conditions. Our paper adopts their hyperparameter
+    heuristics, including the number of trials and generations.
+
+\subsection{Co-evolutionary algorithms.}
 Co-evolution refers to simultaneously evolving two interacting populations so
 that each drives improvement in the other. Hillis~\cite{hillis1990} demonstrated
 this in sorting networks, showing that co-evolving ``parasite'' programs
-prevents premature convergence. Rosin and Belew~\cite{rosin1997} formalized
-competitive co-evolution and introduced the Competitive Fitness Archive to
-handle cycling and intransitivity; our Hall of Fame mechanism is directly
-inspired by that idea. Ramos et al.~\cite{ramos2016} applied co-evolutionary
-methods to chess program development, providing a close precedent for the
+prevents premature convergence. Rosin and Belew~\cite{rosin1997} formalized adversary informativeness and introduced Hall-of-Fame archives to prevent loss of historically best opponents. Both ideas inform our implementation. Ramos et al.~\cite{ramos2016} applied co-evolutionary methods to chess program development, providing a close precedent for the
 approach we take here.
 
-\textbf{Novelty and diversity.}
+\subsection{Novelty and diversity.}
 Lehman and Stanley~\cite{lehman2011} showed that optimizing for behavioral
-novelty---rather than a fixed objective---can outperform conventional
+novelty, rather than a fixed objective, can outperform conventional
 goal-directed search. We incorporate novelty as a secondary component of
 opponent fitness to prevent the opponent population from collapsing to a
 single adversarial mixture strategy.
 
-\textbf{Robust and risk-aware optimization.}
+\subsection{Robust and risk-aware optimization.}
 CVaR (Conditional Value at Risk) is a standard measure for penalizing
 worst-case outcomes rather than just averaging over them
-\cite{rockafellar2000}. We apply it across rating bands: the fitness
-function balances mean score with performance on the worst-performing
-band, which incentivizes robustness across skill levels rather than
-specialization toward one type of opponent.
+\cite{rockafellar2000}. We apply it across rating bands: the fitness function balances mean score with performance on the worst-performing band, which incentivizes robustness across skill levels rather than specialization toward one type of opponent.
 
 
 % =========================================================================
@@ -196,139 +157,49 @@ specialization toward one type of opponent.
 
 \subsection{Position Graph}
 
-The foundation of our model is a directed graph where each node is a chess
-position and each edge is a legal move. Formally, let
-$\mathcal{G} = (\mathcal{V}, \mathcal{E})$ be a directed acyclic graph
-where each node $v \in \mathcal{V}$ is a canonical chess position represented
-as a truncated FEN string (piece placement, active color, castling rights, and
-en passant field only; halfmove and fullmove clocks are stripped to collapse
-transpositions). Each directed edge $(v, v') \in \mathcal{E}$ represents a
-legal move from $v$ to $v'$. Every node $v$ carries a turn indicator
-$\tau(v) \in \{\text{white}, \text{black}\}$ and a ply depth
-$d(v) \in \{0, 1, \ldots, D_{\max}\}$ with $D_{\max} = 10$.
-For each rating band $b \in \mathcal{B} = \{1000\text{-}1399,\,
-1400\text{-}1799,\, 1800\text{-}2199\}$, each edge $(v, v')$ stores a
-play count $N_b(v, v')$ and outcome statistics (white wins, draws, losses)
-from the Lichess game database.
+We model chess as a directed graph $\mathcal{G} = (\mathcal{V}, \mathcal{E})$, where each node $v \in \mathcal{V}$ is a chess position and each edge $(v, v') \in \mathcal{E}$ is a legal move from $v$ to $v'$. Positions are stored as truncated FEN strings (piece layout, whose turn it is, castling rights, and en passant square; move counters are dropped so that positions reached by different move orders are treated as the same node). Each node records whose turn it is and its depth $d(v) \in \{0, \ldots, D_{\max}\}$, with $D_{\max} = 10$. For each rating band $b \in \mathcal{B} = \{1000\text{ -- }1399, 1400\text{ -- }1799, 1800\text{ -- }2199\}$, every edge stores how often that move was played and how the game ended (white win, draw, or loss), taken from the Lichess database.
 
 \subsection{Per-Band Move Policies}
 
-Each rating band has its own characteristic move preferences. We model
-this as a smoothed probability distribution over moves at each position,
-blending band-specific counts with the aggregate (all-ratings) distribution
-to handle sparse positions. For band $b$ and position $v$, the policy
-$p_b(m \mid v)$ gives the probability that a player in band $b$ plays
-move $m$:
+Players in different rating bands have different move preferences. For each band $b$ and position $v$, we estimate the probability that a player in that band plays move $m$ directly from game counts:
 \begin{equation}
-  p_b(m \mid v) =
-  \frac{N_b(v, m) + \alpha\, p_{\mathrm{agg}}(m \mid v)}
-       {\displaystyle\sum_{m'} N_b(v, m') + \alpha},
-  \label{eq:policy}
+p_b(m \mid v) = \frac{N_b(v, m)}{\displaystyle\sum_{m'} N_b(v, m')},
+\label{eq:policy}
 \end{equation}
-where $p_{\mathrm{agg}}(m \mid v) = N_{\mathrm{agg}}(v,m) /
-\sum_{m'} N_{\mathrm{agg}}(v, m')$ is the aggregate (all-rating) move
-probability and $\alpha = 5.0$ provides additive smoothing toward the
-aggregate distribution.
+where $N_b(v, m)$ is the number of times move $m$ was played from position $v$ by players in band $b$.
 
-\subsection{Position Evaluation Cache}
+\subsection{Position Evaluation}
 
-To score positions without simulating full games, we estimate the expected
-White win rate at each position using an empirical-Bayes shrinkage estimator:
-observed outcomes are blended with a global prior to handle positions with
-few games. Concretely, the estimated White-perspective win score at position
-$v$ in band $b$ is:
+To score a position without simulating a full game, we estimate the expected White win rate directly from observed outcomes. For position $v$ in band $b$:
 \begin{equation}
-  \hat{v}_b(v) =
-  \frac{N_b(v) \cdot r_b(v) + \tau\, \mu_0}{N_b(v) + \tau},
-  \label{eq:eval}
+\hat{v}_b(v) = \frac{\text{wins}_b(v) + 0.5 \cdot \text{draws}_b(v)}{N_b(v)},
+\label{eq:eval}
 \end{equation}
-where $r_b(v) = (\text{wins}_b + 0.5 \cdot \text{draws}_b) / N_b(v)$
-is the raw White win rate, $\tau = 20$ is the regularization strength,
-and $\mu_0$ is the global prior mean (average of $\hat{v}$ over all
-positions at depth $\leq D_{\max}$ in the training set). For positions
-with $N_b(v) = 0$, we use $\hat{v}_b(v) = \mu_0$.
+where $N_b(v)$ is the total number of games passing through $v$ in band $b$. A draw counts as half a win. Positions with no recorded games are assigned a score of $0.5$.
 
 \subsection{Repertoire and Closure Constraint}
 
-A repertoire is not simply a list of moves---it is a strategy tree.
-At positions where it is our turn, we commit to a single move. At
-positions where the opponent moves, we must be prepared for every reply
-they are likely to make. We formalize this as follows.
+A repertoire is not just a list of moves, it is a complete game plan. When it is our turn, we pick one move and commit to it. When it is the opponent's turn, we must have an answer ready for every reply they are likely to make.
 
-A \textbf{repertoire} for color $c \in \{\text{white}, \text{black}\}$
-with budget $B$ is a pair $\mathcal{R} = (\phi, \mathcal{S})$ where
-$\phi : \mathcal{V}_c \to \mathcal{E}$ is a partial function mapping
-our-color positions to committed moves (with $|\phi| \leq B$), and
-$\mathcal{S} \subseteq \mathcal{V}$ is the \emph{reached set}: all
-positions reachable by following $\phi$ at our-turn nodes and following
-all covered opponent moves at opponent-turn nodes.
+We track two things: a set of committed moves (one per our-turn position), and a reached set, all positions the game can actually reach if both sides follow the repertoire. The budget $B$ limits how many of our-turn moves we can commit to.
 
-The \textbf{closure rule} enforces coverage completeness. At every
-opponent-turn position $v \in \mathcal{S}$, any move the opponent plays
-in at least $\theta = 0.15$ of observed games must lead to another
-position in the reached set:
+The closure rule fills in the gaps. At any opponent-turn position in the reached set, if the opponent plays a move in at least 15\% of recorded games, the position after that move must also be in the reached set. In other words, the repertoire cannot ignore a common opponent reply just because it is inconvenient. Whenever a new position is added to the reached set, we immediately check all opponent replies at that position and add any that cross the 15\% threshold, repeating this process until no new positions are added.
+
+\subsection{Scoring and Fitness}
+
+Once a repertoire is built, we score it by walking through the strategy tree position by position. At each position:
+\begin{itemize}
+    \item If it is our turn and we have a committed move, we follow it and continue walking.
+    \item If it is our turn but the position is a leaf (no committed move), we use the stored win-rate estimate for that position.
+    \item If it is the opponent's turn, we take a weighted average of the scores of all their replies, weighted by how often players in that rating band choose each move.
+\end{itemize}
+This gives a single expected score for the repertoire against a given rating band. We do this separately for the white and black repertoires, then combine them into one number: the white repertoire's score plus the black repertoire's score averaged.
+
+A good repertoire must hold up against all skill levels, not just one. Given an opponent mixture $\boldsymbol{\pi} \in \{\pi_1, \pi_2, \pi_3 \}$ over the three rating bands, the fitness is:
 \begin{equation}
-  p_{\mathrm{agg}}(m \mid v) \geq \theta
-  \;\Rightarrow\;
-  \mathrm{ch}(v, m) \in \mathcal{S},
-  \qquad \forall\, v \in \mathcal{S},\; \tau(v) \neq c.
-  \label{eq:closure}
+F(\mathcal{R}) = \sum_{i=1}^{3} \pi_i, s_{b_i}(\mathcal{R}) + \lambda \cdot \min_i ( s_{b_i}(\mathcal{R})),
 \end{equation}
-In plain terms: the repertoire cannot ignore a common opponent reply just
-because it is inconvenient. Operationally, whenever a committed move
-expands the reached set, a breadth-first pass adds all opponent replies
-above the threshold recursively.
-
-\subsection{Recursive Evaluation}
-
-Given a repertoire, we compute its expected score against a rating band
-by walking the strategy tree. The recursion $W_b(v, \mathcal{R})$ is
-defined as follows, where $\mathrm{ch}(v,m)$ denotes the child position
-after move $m$:
-\begin{equation}
-W_b(v, \mathcal{R}) =
-\begin{cases}
-  W_b\!\bigl(\mathrm{ch}(v, \phi(v)),\, \mathcal{R}\bigr)
-      & \tau(v)=c,\;\phi(v)\text{ defined}\\[4pt]
-  \hat{v}_b(v)
-      & \tau(v)=c,\;\text{(leaf)}\\[4pt]
-  \sum_{m} p_b(m \mid v)\, W_b\!\bigl(\mathrm{ch}(v,m), \mathcal{R}\bigr)
-      & \tau(v)\neq c
-\end{cases}
-\label{eq:walk}
-\end{equation}
-The three cases correspond to: follow our committed move, fall back to
-the cached score at a leaf, or average over opponent replies weighted by
-their band probability. Positions not in $\mathcal{S}$ are treated as
-leaves with score $\hat{v}_b(v)$.
-
-\subsection{Fitness Function}
-
-A repertoire must perform well across all opponent skill levels, not just
-the average one. We combine per-band scores into a single robust objective
-that penalizes poor performance against any one band. For a joint repertoire
-$\mathcal{R} = (\mathcal{R}_W, \mathcal{R}_B)$, the combined band score
-from White's perspective is:
-\begin{equation}
-  s_b(\mathcal{R}) =
-  \tfrac{1}{2}\, W_b(v_0, \mathcal{R}_W)
-  + \tfrac{1}{2}\,\bigl(1 - W_b(v_0, \mathcal{R}_B)\bigr).
-  \label{eq:bandscore}
-\end{equation}
-Given an opponent mixture $\boldsymbol{\pi} = (\pi_1, \pi_2, \pi_3)$
-over the three rating bands, the robust fitness combines a weighted mean
-score with a penalty on the worst-performing band:
-\begin{equation}
-  F(\mathcal{R}, \boldsymbol{\pi}) =
-  \sum_{i=1}^{3} \pi_i\, s_{b_i}(\mathcal{R})
-  + \lambda \cdot \min_i\, s_{b_i}(\mathcal{R}),
-  \label{eq:fitness}
-\end{equation}
-with $\lambda = 1.0$. The first term rewards mean performance across
-the opponent mixture; the second rewards the score on the hardest band.
-With three bands and a minimum, this corresponds to CVaR at level
-$\alpha = 1/3$---penalizing the expected score in the worst-case third
-of the rating distribution.
+with $\lambda = 1.0$. The first term is the weighted average score across bands; the second adds a bonus equal to the score on the worst band. This pushes the optimizer to fix weak spots rather than pile up points against easier opponents.
 
 
 % =========================================================================
@@ -345,16 +216,16 @@ exceed band-specific thresholds (5,000 at ply $\leq 4$; 20,000 at
 ply $\leq 7$; 50,000 at ply $\leq 10$), and individual moves must appear
 in at least 5\% of games at the parent position to be stored.
 
-The dataset is split by time to prevent leakage. The \textbf{training
-split} covers all games before June 2025 and is used for policy
+The training
+split covers all games before June 2025 and is used for policy
 computation, evaluation caching, and all fitness evaluations during
-optimization. The \textbf{held-out split} covers games from June 2025
+optimization. The held-out split covers games from June 2025
 onwards and is used only to evaluate the final best repertoire from each
 run, under a uniform opponent mixture.
 
 \subsection{System Architecture}
 
-\begin{figure}[!t]
+\begin{figure}[!ht]
   \centering
   \resizebox{\columnwidth}{!}{%
   \begin{tikzpicture}[
@@ -394,7 +265,8 @@ run, under a uniform opponent mixture.
   \draw[arr] (api) -- (db);
   \draw[arr] (db)  -- (graph);
   \draw[arr] (graph) -- (pol);
-  \draw[arr] (graph) -- (ec);
+  % Curved arrow from Position Graph to Eval Cache
+  \draw[arr] (graph) to[bend left=35] (ec);
 
   % Row 2: GA core (repop centred under graph)
   \node[gabox, below=0.85cm of graph] (repop) {Repertoire\\Pop.\;($n$=50)};
@@ -412,12 +284,13 @@ run, under a uniform opponent mixture.
   \draw[arr] (pol) -- ++(0,-0.45) -| (fit);
   \draw[arr] (ec)  -- ++(0,-0.45) -| (fit);
 
-  % Diversity reinit — placed BELOW repop (avoids overlap with fit)
+  % Diversity reinit — placed BELOW repop
   \node[smallbox, below=0.50cm of repop, fill=yellow!12, draw=black!40]
     (div) {Diversity\\check};
-  \draw[arr] (repop.south) -- (div.north);
-  % reinit arc routes left of fit to return to repop
-  \draw[arr] (div.west) -- ++(-0.65,0) |- (repop.west);
+    
+  % Back and forth curved arrows between repop and div
+  \draw[arr] (repop) edge[bend right=25] (div);
+  \draw[arr] (div) edge[bend right=25] (repop);
 
   % Row 3: Opponent co-evolution (COEVOLVE only) — below div
   \node[obox, below=0.50cm of div] (oppop) {\scshape Coevolve:\\Opponent\\Pop.\;($n$=50)};
@@ -429,14 +302,16 @@ run, under a uniform opponent mixture.
   \draw[arr] (oppop) -- (nov);
   \draw[arr] (nov)   edge[bend left=10] (oppop);
 
-  % vs. arrow routes left of fit column to avoid div
-  \draw[darr] (repop.west) -- ++(-1.30,0)
-              |- node[label, right=2pt]{vs.} (oppop.west);
+  % Curved vs. arrow looping around the left side
+  \draw[darr] (repop.west) to[out=180, in=180, looseness=0.3] 
+              node[label, right=2pt]{} (oppop.west);
 
   % Held-out eval — right of nov, same height
   \node[box, right=0.55cm of nov, fill=purple!8, draw=purple!70]
     (heldout) {Held-out\\Evaluation};
-  \draw[arr] (repop.east) -- ++(0.30,0) |- (heldout.north);
+    
+  % Curved arrow from Repertoire Pop to Held-out Evaluation (sharper arc with looseness=0.5)
+  \draw[arr] (repop.east) to[out=0, in=90, looseness=0.3] (heldout.north);
 
   % Bounding boxes + labels
   \begin{scope}[on background layer]
@@ -454,10 +329,10 @@ run, under a uniform opponent mixture.
   \end{tikzpicture}%
   }
   \caption{System architecture. The data pipeline (blue) crawls Lichess,
-    builds a position graph, and precomputes per-band policies and empirical-Bayes
+    builds a position graph, and precomputes per-band policies and
     evaluation scores. The GA loop (green) optimizes a population of repertoires
     via tournament selection, subtree-graft crossover, and four mutation operators,
-    with diversity reinitialization when mean pairwise Jaccard distance falls
+    with diversity re-initialization when mean pairwise Jaccard distance falls
     below 0.25. {\scshape Coevolve} (orange) additionally maintains a co-evolving
     opponent population whose fitness balances exploitation and novelty, maintaining
     a Hall of Fame of the 10 most informative past opponents. Held-out evaluation
@@ -466,47 +341,28 @@ run, under a uniform opponent mixture.
 \end{figure}
 
 Fig.~\ref{fig:arch} shows the overall system architecture. The pipeline
-comprises two phases: data preprocessing (components C1--C4) and GA
-optimization (C5--C8).
+comprises two phases: data preprocessing and GA Optimization.
 
 \subsection{Repertoire Chromosome and Initialization}
 
-Each individual in the GA population is a \emph{candidate}: a paired
-white and black repertoire sharing the same position graph and subject to
-the same budget $B$. The initial population of $n = 50$ candidates is
-seeded with a 50/50 mix of two strategies:
-\begin{itemize}
-  \item \textbf{Greedy initialization:} at each our-turn node, commit the
-        move with the highest aggregate play frequency; expand opponent replies
-        to closure.
-  \item \textbf{Random initialization:} at each our-turn node, sample
-        a move proportional to aggregate frequency; expand to closure.
-\end{itemize}
+Each individual in the GA population is a candidate: a paired white and black repertoire sharing the same position graph and subject to the same budget $B$. The initial population of $n = 50$ candidates are randomly initialized where at each our-turn node, we sample a move proportional to aggregate frequency.
 
 \subsection{Mutation Operators}
 
 Four mutation operators are applied with equal probability:
 \begin{enumerate}
-  \item \textbf{Move swap:} select a random committed node; replace its
-        move with another legal move; rebuild the subtree below.
-  \item \textbf{Extend:} select a random leaf (committed node with no
-        further committed descendants); commit a new move and expand to
-        closure if budget permits.
-  \item \textbf{Prune:} select a random committed node; remove all
-        committed moves in its subtree (reverts that branch to a leaf).
-  \item \textbf{Opening replacement:} select a committed node at ply
-        $\leq 5$; replace its move and reconstruct the subtree below
-        via random initialization.
+    \item Move Swap: Selects a randomly committed node, replaces its chosen move with another legal alternative, and randomly rebuilds the subsequent subtree.
+    \item Extend: Targets a leaf node in the current repertoire tree, commits to a new move, and expands the resulting branch to satisfy the closure rule (provided sufficient budget remains).
+    \item Prune: Selects a randomly committed node and clears all commitments within its subtree, effectively reverting that branch to a leaf node to free up memorization budget.
+    \item Opening Replacement: Targets a committed node early in the game (ply $\leq 5$), replacing its move and entirely reconstructing the downstream subtree via random initialization to encourage large-scale exploration.
 \end{enumerate}
 
 Every mutation attempt enforces both the budget and closure constraints.
-If a constraint cannot be satisfied, the attempt fails and is retried;
-after 5 failed retries, the parent is returned unchanged.
+If a constraint cannot be satisfied, the attempt fails and is retried and after 5 failed retries, the parent is returned unchanged.
 
 \subsection{Crossover}
 
-Crossover works by finding positions where both parents commit to the
-\emph{same} move---these are shared pivot points. If any such pivots exist,
+Crossover works by finding positions where both parents commit to the same move, these are shared pivot points. If any such pivots exist,
 one is sampled at random, and the offspring inherits parent A's decisions
 from the root down to the pivot and parent B's subtree below it. If the
 combined result would exceed the budget, the operation fails and parent A
@@ -518,40 +374,20 @@ The crossover rate is $p_c = 1.0$.
 We use tournament selection with size $k = 2$. To prevent the population
 from collapsing to a single solution too quickly, we monitor mean pairwise
 Jaccard distance over the committed move sets after each generation. If
-this falls below $J_{\min} = 0.25$---meaning candidates have grown too
-similar to one another---25\% of the population is replaced with freshly
+this falls below $J_{\min} = 0.25$, meaning candidates have grown too
+similar to one another, 25\% of the population is replaced with freshly
 random-initialized candidates.
 
 \subsection{Co-evolutionary Opponent Model}
 
-In {\scshape Coevolve}, the opponent is not fixed---it also evolves.
-Each opponent is represented as a mixture $\boldsymbol{\pi} \in \Delta^2$
-over the three rating bands, where $\Delta^2$ is the 3-simplex. Intuitively,
-this encodes how much weight to give each skill level when evaluating a
-repertoire. The {\scshape Coevolve} variant maintains 50 such opponent
-chromosomes, each scored against the current repertoire population with:
+In \textsc{Coevolve}, the opponent model is dynamic rather than fixed. Each opponent is represented as a mixture $\boldsymbol{\pi} \in \Delta^2$ over the three rating bands, where $\Delta^2$ denotes the 2-simplex. Intuitively, this encodes the weight assigned to each skill level when evaluating a repertoire. The \textsc{Coevolve} variant maintains a population of 50 such opponent chromosomes, each scored against the current repertoire population as follows:
 \begin{equation}
-  f_{\mathrm{opp}}(\boldsymbol{\pi}) =
-  -\overline{F}(\boldsymbol{\pi}) + \eta \cdot d_{\text{nov}}(\boldsymbol{\pi}),
-  \label{eq:oppfit}
+f_{\mathrm{opp}}(\boldsymbol{\pi}) = -\overline{F}(\boldsymbol{\pi}) + \eta \cdot d_{\text{nov}}(\boldsymbol{\pi}),
+\label{eq:oppfit}
 \end{equation}
-Here $\overline{F}(\boldsymbol{\pi})$ is the mean repertoire fitness under
-mixture $\boldsymbol{\pi}$ (negated because a strong opponent is one that
-produces low scores), $d_{\text{nov}}$ is the mean $\ell_2$ distance to all
-other current opponents, and $\eta = 0.5$ is the novelty weight. Opponents
-reproduce via convex-blend crossover ($p_c = 1.0$) and Dirichlet-noise
-mutation, where the updated mixture is $\boldsymbol{\pi}' =
-(1 - s)\,\boldsymbol{\pi} + s\,\mathbf{d}$ with
-$\mathbf{d} \sim \mathrm{Dir}(\mathbf{1})$ and strength $s = 0.5$.
+where $\overline{F}(\boldsymbol{\pi})$ is the mean repertoire fitness under mixture $\boldsymbol{\pi}$ (negated because a strong opponent is one that produces low scores), $d_{\text{nov}}$ is the mean $\ell_2$ distance to all other current opponents, and $\eta = 0.5$ is the novelty weight. Opponents reproduce via convex-blend crossover ($p_c = 1.0$) and mutation strength $s = 0.5$.
 
-A key challenge in co-evolution is evaluation instability: because the
-opponent population changes every generation, fitness scores are difficult
-to compare across time. To address this, we maintain a \textbf{Hall of
-Fame} of the 10 opponents with the highest fitness-variance across the
-current repertoire population---in other words, the opponents that best
-discriminate between strong and weak repertoires. Repertoire fitness is
-evaluated against these Hall-of-Fame opponents rather than the current
-opponent population, providing a stable evaluation signal across generations.
+A practical challenge in co-evolution is that fitness scores become difficult to compare over time as the opponent population shifts. To ensure evaluation stability, we maintain a Hall of Fame: a fixed set of the 10 opponents that best distinguish strong repertoires from weak ones, identified by the highest fitness variance across the current repertoire population. Repertoires are always scored against these Hall-of-Fame opponents rather than the transient opponent pool, providing a consistent standard across generations.
 
 \subsection{Fitness Evaluation for Repertoires}
 
@@ -565,43 +401,22 @@ opponents in the same generation, avoiding redundant computation.
 
 \subsection{Non-GA Baselines}
 
-To give context for what the GA actually buys, we include three
-non-evolutionary baselines, each given the same evaluation budget of
-6,000 fitness evaluations:
+To give context for what the GA actually does, we include three
+non-evolutionary baselines, each given the same evaluation budget of 10,000 fitness evaluations:
 \begin{itemize}
-  \item \textbf{Most-played:} a single greedy pass from the root,
-        always committing the most popular move; no search.
-  \item \textbf{Random search:} sample 6,000 random candidates
-        (via random initialization), return the best.
-  \item \textbf{Greedy hillclimb:} start from the greedy solution;
-        apply 6,000 random mutations, accepting each only if fitness
-        improves ($= (1{+}1)$-ES).
+\item Most-Played: A deterministic heuristic that performs a single greedy pass from the root, always committing to the move with the highest game frequency without further search.
+\item Random Search: A global search baseline that samples 10,000 independent candidates via random initialization and retains the individual with the highest fitness.
+\item Greedy Hillclimb: A local search approach that begins with the Most-Played solution and iteratively applies 10,000 random mutations, accepting a new candidate only if it strictly improves upon the current fitness.
 \end{itemize}
 
+\subsection{Experimental Setup}
+\label{sec:setup}
 
-% =========================================================================
-\section{Experimental Setup}
+Table~\ref{tab:hyperparams} lists all fixed hyperparameters.  We employ the use of the following Statistical
+tests: paired Wilcoxon signed-rank (paired across seeds),
+Holm-corrected and Vargha--Delaney $A_{12}$ effect size.
 
-\textbf{Data.} We use Lichess rapid and classical games crawled via
-the Lichess Opening Explorer API. The training split covers all games
-before June 2025; the held-out split covers games from June 2025 onwards.
-The position graph includes all positions up to $D_{\max} = 10$ ply
-(five full moves per side).
-
-\textbf{Methods.} We evaluate five methods: \textsc{Baseline}
-(most-played), \textsc{Random}, \textsc{Hillclimb}, \textsc{Static},
-and \textsc{Coevolve}. To isolate the contribution of the closure rule,
-we also run two ablation variants---\textsc{Static-NoClosure} and
-\textsc{Coevolve-NoClosure}---that disable it entirely.
-
-\textbf{Budget conditions.} All methods run under two budget constraints:
-$B = 10$ committed moves per color (our primary condition) and $B = 25$
-(secondary), representing compact and expanded repertoires respectively.
-
-\textbf{Hyperparameters.} All fixed hyperparameters are listed in
-Table~\ref{tab:hyperparams}.
-
-\begin{table}[!t]
+\begin{table}[!ht] % Changed from !t to !ht to keep it closer to the text
   \centering
   \caption{Fixed hyperparameters used in all experiments.}
   \label{tab:hyperparams}
@@ -611,42 +426,89 @@ Table~\ref{tab:hyperparams}.
     \toprule
     \textbf{Parameter} & \textbf{Value} \\
     \midrule
-    Repertoire population $n_R$   & 50 \\
-    Opponent population $n_O$     & 50 \\
-    Generations $G$               & 100 \\
-    Tournament size $k$           & 2 \\
-    Crossover rate $p_c$          & 1.0 \\
-    Mutation rate $p_m$           & 0.5 \\
-    Closure threshold $\theta$    & 0.15 \\
-    CVaR weight $\lambda$         & 1.0 \\
-    Novelty weight $\eta$         & 0.5 \\
-    Hall of Fame size             & 10 \\
-    Diversity threshold $J_{\min}$& 0.25 \\
-    Policy smoothing $\alpha$     & 5.0 \\
-    Score shrinkage $\tau$        & 20 \\
-    Max ply depth $D_{\max}$      & 10 \\
-    Seeds                         & 30 (1000--1029) \\
+    Memorization budget $\mathcal{B}$           & 25 / 10 \\
+    Repertoire population $n_R$    & 50 \\
+    Opponent population $n_O$      & 50 \\
+    Generations $G$                & 100 \\
+    Tournament size $k$            & 2 \\
+    Crossover rate $p_c$           & 1.0 \\
+    Mutation rate $p_m$            & 0.5 \\
+    Closure threshold $\theta$     & 0.15 \\
+    CVaR weight $\lambda$          & 1.0 \\
+    Novelty weight $\eta$          & 0.5 \\
+    Hall of Fame size              & 10 \\
+    Diversity threshold $J_{\min}$ & 0.25 \\
+    Max ply depth $D_{\max}$       & 10 \\
+    Seeds                          & 30 (1000--1029) \\
     \bottomrule
   \end{tabular}
 \end{table}
+% =========================================================================
+% \section{Experimental Setup}
 
-\textbf{Seeds and reproducibility.} All methods run with the same 30
-independent random seeds (1000--1029), enabling paired statistical tests
-that control for run-to-run variability.
+% \textbf{Data.} We use Lichess rapid and classical games crawled via
+% the Lichess Opening Explorer API. The training split covers all games
+% before June 2025; the held-out split covers games from June 2025 onwards.
+% The position graph includes all positions up to $D_{\max} = 10$ ply
+% (five full moves per side).
 
-\textbf{Evaluation metrics.}
-The primary metric is the \textbf{held-out uniform mean score}: the fitness
-of the best candidate from each run, evaluated on held-out data under the
-uniform opponent mixture. The secondary metric is the \textbf{held-out
-worst-band score}: the minimum score across the three rating bands, which
-serves as a proxy for robustness.
+% \textbf{Methods.} We evaluate five methods: \textsc{Baseline}
+% (most-played), \textsc{Random}, \textsc{Hillclimb}, \textsc{Static},
+% and \textsc{Coevolve}. To isolate the contribution of the closure rule,
+% we also run two ablation variants, \textsc{Static-NoClosure} and
+% \textsc{Coevolve-NoClosure}, that disable it entirely.
 
-\textbf{Statistics.} We report mean $\pm$ standard deviation across 30
-seeds. Pairwise comparisons use two-sided Wilcoxon signed-rank tests
-(paired within seed) with Holm correction for multiple comparisons.
-Effect sizes use the Vargha-Delaney $A_{12}$ statistic: $A_{12} < 0.5$
-means method A is worse, $A_{12} > 0.5$ means method A is better, and
-$A_{12} = 0.5$ indicates no difference.
+% \textbf{Budget conditions.} All methods run under two budget constraints:
+% $B = 10$ committed moves per color (our primary condition) and $B = 25$
+% (secondary), representing compact and expanded repertoires respectively.
+
+% \textbf{Hyperparameters.} All fixed hyperparameters are listed in
+% Table~\ref{tab:hyperparams}.
+
+% \begin{table}[!t]
+%   \centering
+%   \caption{Fixed hyperparameters used in all experiments.}
+%   \label{tab:hyperparams}
+%   \renewcommand{\arraystretch}{1.10}
+%   \setlength{\tabcolsep}{5pt}
+%   \begin{tabular}{lc}
+%     \toprule
+%     \textbf{Parameter} & \textbf{Value} \\
+%     \midrule
+%     Repertoire population $n_R$   & 50 \\
+%     Opponent population $n_O$     & 50 \\
+%     Generations $G$               & 100 \\
+%     Tournament size $k$           & 2 \\
+%     Crossover rate $p_c$          & 1.0 \\
+%     Mutation rate $p_m$           & 0.5 \\
+%     Closure threshold $\theta$    & 0.15 \\
+%     CVaR weight $\lambda$         & 1.0 \\
+%     Novelty weight $\eta$         & 0.5 \\
+%     Hall of Fame size             & 10 \\
+%     Diversity threshold $J_{\min}$& 0.25 \\
+%     Max ply depth $D_{\max}$      & 10 \\
+%     Seeds                         & 30 (1000--1029) \\
+%     \bottomrule
+%   \end{tabular}
+% \end{table}
+
+% \textbf{Seeds and reproducibility.} All methods run with the same 30
+% independent random seeds (1000--1029), enabling paired statistical tests
+% that control for run-to-run variability.
+
+% \textbf{Evaluation metrics.}
+% The primary metric is the \textbf{held-out uniform mean score}: the fitness
+% of the best candidate from each run, evaluated on held-out data under the
+% uniform opponent mixture. The secondary metric is the \textbf{held-out
+% worst-band score}: the minimum score across the three rating bands, which
+% serves as a proxy for robustness.
+
+% \textbf{Statistics.} We report mean $\pm$ standard deviation across 30
+% seeds. Pairwise comparisons use two-sided Wilcoxon signed-rank tests
+% (paired within seed) with Holm correction for multiple comparisons.
+% Effect sizes use the Vargha-Delaney $A_{12}$ statistic: $A_{12} < 0.5$
+% means method A is worse, $A_{12} > 0.5$ means method A is better, and
+% $A_{12} = 0.5$ indicates no difference.
 
 
 % =========================================================================
@@ -654,15 +516,15 @@ $A_{12} = 0.5$ indicates no difference.
 
 \subsection{Main Comparison}
 
-The three optimized methods---Hillclimb, \textsc{Static}, and
-\textsc{Coevolve}---converge to essentially the same held-out score, while
+The three optimized methods Hillclimb, \textsc{Static}, and
+\textsc{Coevolve} converge to essentially the same held-out score, while
 the most-played baseline and random search fall well behind. At $B = 10$,
-all three reach $0.527 \pm 0.002$ against the baseline's $0.498$---a gap
-of roughly 3 percentage points (Table~\ref{tab:main}). Random search scores
+all three reach $0.527 \pm 0.002$ against the baseline's $0.498$, a gap
+of roughly 0.03 (Table~\ref{tab:main}). Random search scores
 $0.522 \pm 0.002$, meaningfully lower than the other optimized methods
 despite the same evaluation budget. The pattern repeats at $B = 25$, where
 the optimized methods reach $0.525 \pm 0.002$ versus $0.492$ for the
-baseline. One somewhat surprising result: $B = 10$ slightly outperforms
+baseline. One somewhat surprising result is that $B = 10$ slightly outperforms
 $B = 25$, suggesting that a tighter budget pushes the algorithm toward
 higher-value lines.
 
@@ -715,8 +577,8 @@ The three optimized methods are statistically indistinguishable from one
 another: Wilcoxon $p \geq 0.98$ and $A_{12} \in [0.45, 0.54]$ for all
 pairwise comparisons (Table~\ref{tab:pairwise}). All three significantly
 outperform random search ($p < 10^{-7}$, $A_{12} \leq 0.07$) and the
-most-played baseline ($p < 1.5 \times 10^{-8}$, $A_{12} = 0.0$, meaning
-no baseline seed beats any optimized seed).
+most-played baseline ($p < 1.5 \times 10^{-8}$, $A_{12} = 0.0$) meaning
+no baseline seed beats any optimized seed.
 
 \begin{table}[!t]
   \centering
@@ -761,9 +623,9 @@ no baseline seed beats any optimized seed).
 
 The key takeaway from Fig.~\ref{fig:ga_vs_nonga} is that the greedy
 hillclimber matches both GA methods in final quality, with tighter spread
-at $B = 10$. It is not a sophisticated algorithm---just steepest-ascent
-mutations from a greedy initialization---yet it finds solutions that neither
-GA variant can improve upon. Random search, which samples 6,000 candidates
+at $B = 10$. It is not a sophisticated algorithm, just steepest-ascent
+mutations from a greedy initialization, yet it finds solutions that neither
+GA variant can improve upon. Random search, which samples 10,000 candidates
 without structure, is significantly worse than all three, confirming that
 directed local exploration pays off on this landscape.
 
@@ -822,10 +684,19 @@ regardless of variant.
   \caption{Per-band scores at $B = 10$. The three rating bands show
     meaningfully different score profiles, confirming that optimizing
     for robustness across bands is non-trivial.}
-  \label{fig:band}
+  \label{fig:band10}
 \end{figure}
 
-Fig.~\ref{fig:band} reveals why a mean-only objective would be
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\columnwidth]{results_25/band_breakdown.png}
+  \caption{Per-band scores at $B = 25$. The three rating bands show
+    meaningfully different score profiles, confirming that optimizing
+    for robustness across bands is non-trivial.}
+  \label{fig:band25}
+\end{figure}
+
+Fig.~\ref{fig:band10} and Fig.~\ref{fig:band25}  reveals why a mean-only objective would be
 insufficient: the three rating bands show meaningfully different score
 profiles, with gaps of several percentage points between them. A repertoire
 that performs well against mid-range players does not automatically hold up
@@ -933,97 +804,90 @@ $1.0$~s at $B = 10$.
 
 
 % =========================================================================
+
 \section{Discussion}
 
-\textbf{The closure rule is the decisive contribution.}
-The most important takeaway from this work is not the GA---it is the
-closure rule. Removing it drops performance by 2.3~pp with perfect effect
-size ($A_{12} = 1.0$), meaning every single seed across all 30 runs performs
-worse without it. This holds for both GA variants and both budget conditions.
-The closure rule enforces what we might call \emph{adversarial completeness}:
-the repertoire must handle all likely opponent replies, not just the single
-most popular continuation. Without this constraint, the GA exploits the
-freedom to ignore inconvenient branches---producing repertoires that score
-well on training data but would fail in practice as soon as the opponent
-plays a common alternative.
+\subsection{The Closure Rule Is the Decisive Contribution}
+The most important takeaway from this work is not the GA but the closure rule. Removing it drops held-out performance by 2.3~pp with perfect effect
+size ($A_{12} = 1.0$, $p < 7.5 \times 10^{-9}$), meaning every single seed
+across all 30 runs performs worse without it, across both GA variants and
+both budget conditions. The closure rule enforces what we call adversarial completeness: the repertoire must handle all likely
+opponent replies, not just the single most popular continuation. Without this constraint, the GA exploits the freedom to ignore inconvenient branches, producing repertoires that score well on training data but fail in practice as soon as an opponent plays a common alternative.
 
-\textbf{Co-evolution does not help.}
-{\scshape Coevolve} was designed with principled co-evolutionary machinery:
-adaptive opponent populations, novelty-driven fitness, and a Hall of Fame to
-maintain evaluation stability. Yet it provides no statistically significant
-benefit over {\scshape Static} ($p = 1.0$, $A_{12} = 0.45$). The most
-likely explanation is that the opponent search space---a 3-simplex over three
-rating bands---is simply too low-dimensional to offer meaningful adversarial
-diversity. The uniform mixture already captures most of the signal, leaving
-no useful gradient for co-evolution to exploit. A richer opponent model, such
-as per-position move policies that vary by style rather than just rating,
-might create enough adversarial pressure for co-evolution to pay off.
+\subsection{Co-Evolution Adds No Benefit Over a Static Opponent}
+{\scshape CoEvolve} was designed with principled co-evolutionary machinery:
+adaptive opponent populations, novelty-driven fitness, and a Hall of Fame
+for evaluation stability. Yet it provides no statistically significant
+benefit over {\scshape Static} ($p = 1.0$, $A_{12} = 0.45$) at $35\times$
+the computational cost. The most likely explanation is that the opponent
+search space, a 3-simplex over three rating bands, is simply too
+low-dimensional to generate meaningful adversarial pressure. The uniform mixture already captures most of the signal, leaving no useful gradient for
+co-evolution to exploit. A richer opponent model, such as per-position move policies that vary by playing style rather than just rating, might create
+enough adversarial diversity for co-evolution to pay off.
 
-\textbf{Greedy hillclimbing is competitive.}
-The greedy hillclimber matches both GA variants in final quality at roughly
-$1/90$ of {\scshape Coevolve}'s cost at $B = 10$. This strongly suggests
-that the closure-constrained fitness landscape is largely unimodal, or at
-least contains a dominant basin of attraction that a simple local-search
-procedure can reach. At the scales tested here, maintaining a population of
-50 candidates brings no measurable benefit over a single trajectory of
-steepest-ascent mutations.
+\subsection{The Fitness Landscape Favours Simple Local Search}
+The greedy hill-climber matches both GA variants in final held-out quality
+at roughly $1/90$ of {\scshape CoEvolve}'s runtime at $B = 10$. This
+strongly suggests that the closure-constrained fitness landscape is largely
+unimodal, or at least contains a dominant basin of attraction that a simple
+local-search procedure can reach. At the scales tested here, maintaining a
+population of 50 candidates and running crossover brings no measurable
+benefit over a single trajectory of steepest-ascent mutations.
 
-\textbf{Budget 10 vs.\ Budget 25.}
+\subsection{A Tighter Budget Does Not Hurt Performance}
 The smaller budget slightly outperforms the larger one (0.5272 vs.\ 0.5252
-for {\scshape Coevolve}), which at first seems counter-intuitive. One
-explanation is that a tighter budget forces the algorithm to commit only to
-the highest-value moves, while a larger budget allows it to fill remaining
-space with marginal lines that dilute overall quality. Another possibility
-is that $B = 25$ evaluations are individually more expensive, so 100
-generations may not be enough for full convergence at the larger budget.
+for {\scshape CoEvolve}), which at first seems counter-intuitive. A tighter
+budget forces the algorithm to commit only to the highest-value moves, while
+a larger budget may fill remaining space with marginal lines that dilute
+overall quality. An alternative explanation is that $B = 25$ evaluations are
+individually more expensive, and 100 generations may not be sufficient for
+full convergence at that scale.
 
-\textbf{Limitations.} The position graph covers only 10 ply, while real
-games regularly branch deeper. The opponent model aggregates all players
-within a rating band into a single mixture, ignoring individual style.
-The evaluation metric---an empirical-Bayes win rate from historical
-games---may not perfectly capture the value of a move when an opponent
-knows they are facing a prepared repertoire. Addressing these gaps with
-deeper crawls, individualized opponent models, and online evaluation against
-real players would be natural next steps.
+\subsection{Limitations}
+The position graph covers only 10~ply, while real games regularly extend
+deeper. The opponent model aggregates all players within a rating band into
+a single mixture, ignoring individual style variation. The evaluation metric, an empirical-Bayes win rate from historical games, may not fully capture
+move value when an opponent knows they face a prepared repertoire. These gaps
+point directly to the most promising areas for future work.
 
 
-% =========================================================================
 \section{Conclusion}
 
-We have presented a system for automatically constructing robust chess
-opening repertoires under a memorization budget constraint, combining a
-genetic algorithm with a novel closure rule evaluated on real Lichess game
-data. The central finding is that the closure rule---which requires the
-repertoire to cover all opponent replies played in at least 15\% of observed
-games---accounts for the bulk of the improvement. It yields a
-+2.3~percentage-point gain in held-out expected score with perfect effect
-size ($A_{12} = 1.0$, $p < 7.5 \times 10^{-9}$) across all 30 seeds and
-both budget conditions. Without it, the GA exploits gaps in opponent coverage
-to inflate training scores while undermining practical robustness.
+We presented a model for automatically constructing robust chess opening repertoires under a memorization budget, combining a genetic algorithm with a closure rule evaluated on real Lichess game data. The central finding is that the closure rule, which requires the repertoire to cover all opponent replies played in at least 15\% of observed games, accounts for the bulk of the performance gain. It yields $+2.3$~pp in held-out expected score with Vargha–Delaney effect size ($A_{12} = 1.0$) across all 30 seeds and both budget conditions, confirming that adversarial completeness is the
+essential ingredient for practical robustness.
 
 The co-evolutionary component, despite its principled design, adds no
-measurable benefit over a static GA ($p = 1.0$, $A_{12} = 0.45$) at
-35$\times$ the computational cost. The likely cause is that the opponent
-search space---three rating-band weights on a simplex---is too restricted
-to generate meaningful adversarial pressure. More strikingly, a greedy
-hillclimber matches GA-level quality at roughly 1/90 of {\scshape Coevolve}'s
-runtime, suggesting the closure-constrained fitness landscape is well-suited
-to simple local search.
+measurable benefit over a static opponent ($p = 1.0$, $A_{12} = 0.45$),
+with the likely cause being that a 3-simplex opponent space is too restricted
+to generate exploitable adversarial pressure. More strikingly, a greedy
+hill-climber matches GA-level quality at $\sim$1/90 of {\scshape CoEvolve}'s
+runtime, indicating the closure-constrained landscape is well-suited to
+simple local search, and that population-based search offers diminishing returns at the scales tested.
 
-Future work should explore deeper position graphs, more expressive opponent
-models (e.g., per-position move policies that capture individual playing
-style), and online adaptation based on real-game outcomes. The closure rule
-concept may also generalize beyond chess to other adversarial preparation
-problems where coverage completeness is essential---any domain where ignoring
-a branch is a practical failure mode.
+The closure rule can be applied to any adversarial problem where preparation must be comprehensive. It serves as a necessary constraint in tasks where ignoring a likely path represents a total failure of the strategic model.
 
+
+\section{Future Work}
+\label{sec:future}
+
+\subsection{Richer Opponent Models for Meaningful Co-Evolutionary Pressure}
+The 3-simplex opponent space is too constrained to expose meaningful
+adversarial diversity. We can replace the band weights with per-position move policies that capture individual playing style which would provide a far more expressive adversarial signal.
+
+\subsection{Deeper Position Graphs}
+Crawling to deeper ply would expose more opening systems, widen the performance gap between methods, and test whether closure remains the dominant factor in deeper trees.
+
+\subsection{Engine-Grounded Evaluation}
+Cross-referencing held-out win rates with Stockfish evaluations would
+separate ``human exploits at this rating'' from ``is objectively stronger,'' clarifying the practical value of each repertoire.
+
+\subsection{Joint White--Black Co-Evolution}
+A single candidate co-evolving its White and Black repertoires simultaneously against a shared opponent population could discover synergistic opening choices across colors, rather than optimizing each side independently.
 % =========================================================================
 \section*{Acknowledgment}
 
 This work was completed as part of the Computational Intelligence
-(CS~462) course, Spring 2026, Habib University, Karachi, Pakistan.
-Opening data is sourced from the Lichess Opening Explorer API under
-the Creative Commons Attribution 4.0 license.
+(CS~462) course, Spring 2026, Habib University, Karachi, Pakistan. Opening data is sourced from the Lichess Opening Explorer API under the Creative Commons Attribution 4.0 license.
 
 % =========================================================================
 \begin{thebibliography}{9}

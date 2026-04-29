@@ -1,0 +1,173 @@
+======================================================================
+  CHESS REPERTOIRE PROJECT
+  GROUPED BY OPENING — continuations shown after the opening header
+  Ranked by held-out fitness (lambda=1.0, best seed per mode)
+======================================================================
+
+######################################################################
+  MODE : COEVOLVE  |  SEED : 1015  |  HELDOUT_LEGACY : 1.0527  |  HELDOUT_UNIFORM : 0.5305  |  WHITE : 0.5482  |  BLACK : 0.5129
+  White committed : 10 moves  |  Black committed : 10 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nc3  d5)  ── 3 lines  ──────────────────────────────
+       3.Bf4  Bf5
+       3.Bf4  Nc6
+       3.Bf4  a6
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nc3  e6)  ── 2 lines  ──────────────────────────────
+       3.e4  Bb4
+       3.e4  d5
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nc3  g6)  ── 2 lines  ──────────────────────────────
+       3.e4  Bg7
+       3.e4  d6
+
+  ── Anti-Indian  (1.d4  d5  2.c4  Nf6)  ── 2 lines  ────────────────────────────────
+       3.cxd5  Nxd5
+       3.cxd5  Qxd5
+
+  ── Slav Defense  (1.d4  d5  2.c4  c6)  ── 1 line  ────────────────────────────────
+       3.Nf3
+
+  ── Queen's Gambit Accepted  (1.d4  d5  2.c4  dxc4)  ── 1 line  ───────────────────
+       3.Nf3  Nf6
+
+  ── Queen's Gambit Declined  (1.d4  d5  2.c4  e6)  ── 1 line  ─────────────────────
+       3.Nf3  Nf6
+
+
+  ── AS BLACK ──
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Bf4  g6)  ── 2 lines  ──────────────────────────────
+       3.Nc3
+       3.e3
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nf3  g6)  ── 2 lines  ──────────────────────────────
+       3.e3  Bg7  4.Bd3
+       3.e3  Bg7  4.c4
+
+  ── Benoni Defense  (1.d4  Nf6  2.c4  c5)  ── 2 lines  ─────────────────────────────
+       3.d5  b5  4.b3
+       3.d5  b5  4.cxb5
+
+  ── Sicilian Defense  (1.e4  c5  2.Bc4  Nc6)  ── 1 line  ──────────────────────────
+       3.Nf3
+
+  ── Sicilian — Kan/Taimanov  (1.e4  c5  2.Nf3  e6)  ── 1 line  ────────────────────
+       3.d4  cxd4  4.Nxd4
+
+
+######################################################################
+  MODE : STATIC  |  SEED : 1010  |  HELDOUT_LEGACY : 1.0535  |  HELDOUT_UNIFORM : 0.5304  |  WHITE : 0.5482  |  BLACK : 0.5126
+  White committed : 10 moves  |  Black committed : 8 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nc3  d5)  ── 3 lines  ──────────────────────────────
+       3.Bf4  Bf5
+       3.Bf4  Nc6
+       3.Bf4  a6
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nc3  e6)  ── 2 lines  ──────────────────────────────
+       3.e4  Bb4
+       3.e4  d5
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nc3  g6)  ── 2 lines  ──────────────────────────────
+       3.e4  Bg7
+       3.e4  d6
+
+  ── Anti-Indian  (1.d4  d5  2.c4  Nf6)  ── 2 lines  ────────────────────────────────
+       3.cxd5  Nxd5
+       3.cxd5  Qxd5
+
+  ── Slav Defense  (1.d4  d5  2.c4  c6)  ── 1 line  ────────────────────────────────
+       3.Nf3  Nf6
+
+  ── Queen's Gambit Accepted  (1.d4  d5  2.c4  dxc4)  ── 1 line  ───────────────────
+       3.Nf3  Nf6
+
+  ── Queen's Gambit Declined  (1.d4  d5  2.c4  e6)  ── 1 line  ─────────────────────
+       3.Nf3  Nf6
+
+
+  ── AS BLACK ──
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Bf4  c5)  ── 2 lines  ──────────────────────────────
+       3.c3
+       3.e3
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nf3)  ── 1 line  ──────────────────────────────────
+       [end of line]
+
+  ── Benoni Defense  (1.d4  Nf6  2.c4  c5)  ── 2 lines  ─────────────────────────────
+       3.d5  b5  4.b3
+       3.d5  b5  4.cxb5
+
+  ── Sicilian Defense  (1.e4  c5  2.Bc4)  ── 1 line  ───────────────────────────────
+       [end of line]
+
+  ── Sicilian — Kan/Taimanov  (1.e4  c5  2.Nf3  e6)  ── 2 lines  ────────────────────
+       3.Bc4  d5  4.exd5
+       3.d4  cxd4  4.Nxd4
+
+
+######################################################################
+  MODE : GREEDY_HILLCLIMB  |  SEED : 1026  |  HELDOUT_LEGACY : 1.0524  |  HELDOUT_UNIFORM : 0.5306  |  WHITE : 0.5476  |  BLACK : 0.5136
+  White committed : 10 moves  |  Black committed : 10 moves
+######################################################################
+
+  ── AS WHITE ──
+
+  ── Grünfeld Defense  (1.d4  Nf6  2.c4  d5)  ── 2 lines  ───────────────────────────
+       3.cxd5  Nxd5
+       3.cxd5  Qxd5
+
+  ── Indian / QGD  (1.d4  Nf6  2.c4  e6)  ── 3 lines  ───────────────────────────────
+       3.Nf3  Bb4+
+       3.Nf3  b6
+       3.Nf3  d5
+
+  ── King's Indian / Grünfeld  (1.d4  Nf6  2.c4  g6)  ── 1 line  ───────────────────
+       3.Bf4
+
+  ── Anti-Indian  (1.d4  d5  2.c4  Nf6)  ── 2 lines  ────────────────────────────────
+       3.cxd5  Nxd5
+       3.cxd5  Qxd5
+
+  ── Slav Defense  (1.d4  d5  2.c4  c6)  ── 1 line  ────────────────────────────────
+       3.Nf3  Nf6
+
+  ── Queen's Gambit Accepted  (1.d4  d5  2.c4  dxc4)  ── 2 lines  ───────────────────
+       3.Nf3  Nf6
+       3.Nf3  e6
+
+  ── Queen's Gambit Declined  (1.d4  d5  2.c4  e6)  ── 2 lines  ─────────────────────
+       3.Nf3  Nf6
+       3.Nf3  dxc4
+
+
+  ── AS BLACK ──
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Bf4  c5)  ── 2 lines  ──────────────────────────────
+       3.c3
+       3.e3
+
+  ── Queen's Pawn  (1.d4  Nf6  2.Nf3  g6)  ── 3 lines  ──────────────────────────────
+       3.Bf4  Bg7  4.e3
+       3.c4
+       3.e3
+
+  ── Benoni Defense  (1.d4  Nf6  2.c4  c5)  ── 2 lines  ─────────────────────────────
+       3.d5  b5  4.b3
+       3.d5  b5  4.cxb5
+
+  ── Sicilian Defense  (1.e4  c5  2.Bc4  Nc6)  ── 1 line  ──────────────────────────
+       3.Nf3
+
+  ── Sicilian — Kan/Taimanov  (1.e4  c5  2.Nf3  e6)  ── 1 line  ────────────────────
+       3.d4  cxd4  4.Nxd4
+
+
