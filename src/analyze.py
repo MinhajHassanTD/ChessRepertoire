@@ -82,7 +82,7 @@ _METHOD_LABELS = {
     "COEVOLVE_NOCLOSURE":     "CoEvolve (no closure)",
 }
 
-_BAND_COLORS = ["#d62728", "#ff7f0e", "#1f77b4"]   # red, orange, blue per band
+_BAND_COLORS = ["#CC6677", "#88CCEE", "#44AA99"]   # Paul Tol muted: rose, sky, teal
 _BAND_LABELS = {
     "1000-1399": "1000–1399",
     "1400-1799": "1400–1799",
@@ -91,6 +91,31 @@ _BAND_LABELS = {
 
 # GA methods shown in convergence curves (only those with generation history).
 GA_METHODS_CONV = ["STATIC", "COEVOLVE"]
+
+
+# ── Paper-quality matplotlib style ────────────────────────────────────────────
+
+def _paper_style() -> None:
+    """Set rcParams for clean academic figures (call once before plotting)."""
+    plt.rcParams.update({
+        "font.family":           "serif",
+        "font.size":             11,
+        "axes.labelsize":        11,
+        "axes.titlesize":        10,
+        "xtick.labelsize":       9.5,
+        "ytick.labelsize":       9.5,
+        "legend.fontsize":       9,
+        "legend.framealpha":     0.85,
+        "legend.edgecolor":      "#cccccc",
+        "axes.linewidth":        0.8,
+        "grid.linewidth":        0.5,
+        "grid.color":            "#dddddd",
+        "lines.linewidth":       1.8,
+        "patch.linewidth":       0.6,
+        "figure.dpi":            150,
+        "savefig.dpi":           300,
+        "savefig.bbox":          "tight",
+    })
 
 
 # ── I/O ───────────────────────────────────────────────────────────────────────
@@ -447,15 +472,14 @@ def plot_convergence(runs: list[dict], out_path: str) -> None:
         ax.plot(gens, mean_f, label=_METHOD_LABELS[m], color=color, linewidth=2)
         ax.fill_between(gens, mean_f - ci, mean_f + ci, alpha=0.15, color=color)
 
-    ax.set_xlabel("Generation", fontsize=12)
-    ax.set_ylabel("Best Training Fitness", fontsize=12)
-    ax.set_title("Training Convergence — GA Methods  (95% CI across seeds)", fontsize=12)
-    ax.legend(fontsize=10, framealpha=0.9)
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Best Training Fitness")
+    ax.legend(framealpha=0.9)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -508,19 +532,16 @@ def plot_score_distributions(runs: list[dict], out_path: str) -> None:
 
         ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.35)
         ax.set_xticks(positions)
-        ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=9.5)
-        ax.set_ylabel(ylabel, fontsize=10.5)
-        ax.set_title(f"{panel} {ylabel.replace(chr(10), ' ')}", fontsize=11)
+        ax.set_xticklabels(labels, rotation=30, ha="right")
+        ax.set_ylabel(ylabel)
+        ax.text(0.01, 0.99, panel, transform=ax.transAxes,
+                fontweight="bold", fontsize=11, va="top")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.grid(axis="y", alpha=0.25)
 
-    fig.suptitle(
-        "Held-out Score Distributions Across Seeds  (dashed = random play 0.5)",
-        fontsize=12,
-    )
     fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -570,11 +591,10 @@ def plot_band_breakdown(runs: list[dict], out_path: str) -> None:
     ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.35)
     ax.set_xticks(x)
     ax.set_xticklabels(
-        [_METHOD_LABELS[m] for m in METHODS_MAIN], rotation=25, ha="right", fontsize=10
+        [_METHOD_LABELS[m] for m in METHODS_MAIN], rotation=25, ha="right"
     )
-    ax.set_ylabel("Held-out Mean Score", fontsize=11)
-    ax.set_title("Per-Band Performance by Method  (error bars = ±1 SD)", fontsize=12)
-    ax.legend(title="Rating Band", fontsize=10, framealpha=0.9)
+    ax.set_ylabel("Held-out Mean Score")
+    ax.legend(title="Rating Band", framealpha=0.9)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(axis="y", alpha=0.25)
@@ -582,7 +602,7 @@ def plot_band_breakdown(runs: list[dict], out_path: str) -> None:
     if len(all_vals):
         ax.set_ylim(max(0.0, all_vals.min() - 0.04), min(1.0, all_vals.max() + 0.04))
     fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -597,11 +617,10 @@ def plot_white_black_breakdown(runs: list[dict], out_path: str) -> None:
     }
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=False)
-    fig.suptitle("White vs Black Repertoire Performance  (held-out, dashed = 0.5)", fontsize=13)
 
-    for ax, color_key, title, ylabel in [
-        (axes[0], "white_mean", "(a) Playing as White",  "Score Playing as White"),
-        (axes[1], "black_mean", "(b) Playing as Black",  "Score Playing as Black"),
+    for ax, color_key, panel, ylabel in [
+        (axes[0], "white_mean", "(a)", "Score Playing as White"),
+        (axes[1], "black_mean", "(b)", "Score Playing as Black"),
     ]:
         for xi, method in enumerate(all_methods):
             vals = [
@@ -625,16 +644,17 @@ def plot_white_black_breakdown(runs: list[dict], out_path: str) -> None:
         ax.set_xticks(range(len(all_methods)))
         ax.set_xticklabels(
             [_METHOD_LABELS[m] for m in all_methods],
-            rotation=25, ha="right", fontsize=10,
+            rotation=25, ha="right",
         )
-        ax.set_ylabel(ylabel, fontsize=11)
-        ax.set_title(title, fontsize=11)
+        ax.set_ylabel(ylabel)
+        ax.text(0.01, 0.99, panel, transform=ax.transAxes,
+                fontweight="bold", fontsize=11, va="top")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.grid(axis="y", alpha=0.2)
 
     fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -692,8 +712,8 @@ def plot_ga_vs_nonga(runs: list[dict], out_path: str) -> None:
         all_pos = [positions[m] for m in nga_sorted + ga_sorted]
         all_lab = [_METHOD_LABELS[m] for m in nga_sorted + ga_sorted]
         ax.set_xticks(all_pos)
-        ax.set_xticklabels(all_lab, rotation=30, ha="right", fontsize=9.5)
-        ax.set_ylabel(ylabel, fontsize=10.5)
+        ax.set_xticklabels(all_lab, rotation=30, ha="right")
+        ax.set_ylabel(ylabel)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.grid(axis="y", alpha=0.25)
@@ -708,10 +728,9 @@ def plot_ga_vs_nonga(runs: list[dict], out_path: str) -> None:
         Patch(facecolor="#cccccc", hatch="//", edgecolor="black", label="Non-GA baseline"),
         Patch(facecolor="#cccccc", edgecolor="black", label="GA method"),
     ]
-    axes[0].legend(handles=legend_handles, fontsize=9, loc="lower right")
-    fig.suptitle("GA vs Non-GA: Sorted by Score within Group  (error bars = ±1 SD)", fontsize=11)
+    axes[0].legend(handles=legend_handles, loc="lower right")
     fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -743,9 +762,9 @@ def plot_repertoire_structure(runs: list[dict], out_path: str) -> None:
     width = 0.35
     labels_m = [_METHOD_LABELS[m] for m in METHODS_MAIN]
 
-    for ax, key_w, key_b, ylabel, title, show_budget in [
-        (axes[0], "w_comm",  "b_comm",  "Committed Moves",     "(a) Budget Utilization",  True),
-        (axes[1], "w_reach", "b_reach", "Positions in Subgraph","(b) Subgraph Coverage",  False),
+    for ax, key_w, key_b, ylabel, panel, show_budget in [
+        (axes[0], "w_comm",  "b_comm",  "Committed Moves",      "(a)", True),
+        (axes[1], "w_reach", "b_reach", "Positions in Subgraph", "(b)", False),
     ]:
         for offset, key, label, color, hatch in [
             (-width / 2, key_w, "White", "#2196F3", None),
@@ -761,17 +780,17 @@ def plot_repertoire_structure(runs: list[dict], out_path: str) -> None:
             ax.axhline(BUDGET, color="black", linestyle="--", linewidth=1.2,
                        alpha=0.6, label=f"Budget ({BUDGET})")
         ax.set_xticks(x)
-        ax.set_xticklabels(labels_m, rotation=30, ha="right", fontsize=9.5)
-        ax.set_ylabel(ylabel, fontsize=10.5)
-        ax.set_title(title, fontsize=11)
-        ax.legend(fontsize=9, framealpha=0.9)
+        ax.set_xticklabels(labels_m, rotation=30, ha="right")
+        ax.set_ylabel(ylabel)
+        ax.text(0.01, 0.99, panel, transform=ax.transAxes,
+                fontweight="bold", fontsize=11, va="top")
+        ax.legend(framealpha=0.9)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.grid(axis="y", alpha=0.25)
 
-    fig.suptitle("Repertoire Structure Across Seeds  (error bars = ±1 SD)", fontsize=12)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -815,10 +834,10 @@ def plot_coevolve_dynamics(runs: list[dict], out_path: str) -> None:
     ax = axes[0]
     _plot_band(ax, _mat("best_training_fitness"), "#0072B2", label="Best", linestyle="-")
     _plot_band(ax, _mat("mean_training_fitness"), "#56B4E9", label="Mean", linestyle="--")
-    ax.set_xlabel("Generation", fontsize=11)
-    ax.set_ylabel("Training Fitness", fontsize=11)
-    ax.set_title("(a) Best vs Mean Fitness", fontsize=11)
-    ax.legend(fontsize=10)
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Training Fitness")
+    ax.text(0.01, 0.99, "(a)", transform=ax.transAxes, fontweight="bold", fontsize=11, va="top")
+    ax.legend()
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(axis="y", alpha=0.25)
@@ -826,9 +845,9 @@ def plot_coevolve_dynamics(runs: list[dict], out_path: str) -> None:
     # (b) repertoire diversity
     ax = axes[1]
     _plot_band(ax, _mat("repertoire_diversity"), "#009E73")
-    ax.set_xlabel("Generation", fontsize=11)
-    ax.set_ylabel("Mean Pairwise Jaccard Distance", fontsize=11)
-    ax.set_title("(b) Repertoire Population Diversity", fontsize=11)
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Mean Pairwise Jaccard Distance")
+    ax.text(0.01, 0.99, "(b)", transform=ax.transAxes, fontweight="bold", fontsize=11, va="top")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(axis="y", alpha=0.25)
@@ -843,16 +862,15 @@ def plot_coevolve_dynamics(runs: list[dict], out_path: str) -> None:
     if opp_rows:
         opp_mat = np.array(opp_rows)
         _plot_band(ax, opp_mat, "#E69F00")
-    ax.set_xlabel("Generation", fontsize=11)
-    ax.set_ylabel("Mean L2 Distance", fontsize=11)
-    ax.set_title("(c) Opponent Population Diversity", fontsize=11)
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Mean L2 Distance")
+    ax.text(0.01, 0.99, "(c)", transform=ax.transAxes, fontweight="bold", fontsize=11, va="top")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(axis="y", alpha=0.25)
 
-    fig.suptitle("COEVOLVE Dynamics Across Seeds  (95% CI)", fontsize=12)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -1344,7 +1362,6 @@ def plot_closure_ablation(runs: list[dict], out_path: str) -> None:
         if not all_data:
             ax.text(0.5, 0.5, "No ablation data yet", ha="center", va="center",
                     transform=ax.transAxes, color="grey", fontsize=11)
-            ax.set_title(ylabel, fontsize=11)
             continue
 
         bp = ax.boxplot(
@@ -1364,19 +1381,18 @@ def plot_closure_ablation(runs: list[dict], out_path: str) -> None:
 
         ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.35)
         ax.set_xticks(positions)
-        ax.set_xticklabels(labels, fontsize=9)
-        ax.set_ylabel(ylabel, fontsize=10.5)
-        ax.set_title(ylabel, fontsize=11)
+        ax.set_xticklabels(labels)
+        ax.set_ylabel(ylabel)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.grid(axis="y", alpha=0.25)
 
-    fig.suptitle(
-        "Closure Ablation: Does Forcing Opponent Reply Coverage Help?  (same seeds, paired)",
-        fontsize=11,
-    )
+    for panel, ax in zip(("(a)", "(b)"), axes):
+        ax.text(0.01, 0.99, panel, transform=ax.transAxes,
+                fontweight="bold", fontsize=11, va="top")
+
     fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -1537,7 +1553,6 @@ def _draw_rep_tree(ax, G, root: int, pos: dict, n_leaves_total: int,
     ax.set_xlim(min(xs) - 0.6, max(xs) + 0.6)
     ax.set_ylim(min(ys) - 1.0, max(ys) + 1.0)
     ax.axis("off")
-    ax.set_title(title, fontsize=9, fontweight="bold", pad=4)
 
     # Edges
     for u, v in G.edges():
@@ -1671,20 +1686,268 @@ def plot_repertoire_graphs(results_dir: str, max_depth: int = 2) -> None:
 
         fig, axes = plt.subplots(1, 2, figsize=(fig_w, fig_h))
 
-        for ax, side in zip(axes, ("white", "black")):
+        for ax, side, panel in zip(axes, ("white", "black"), ("(a)", "(b)")):
             G, root, pos, nleaves = parsed[side]
-            title = (f"{_METHOD_LABELS.get(mode, mode)} — {SIDE_LABELS[side]}"
-                     f"  (depth ≤ {max_depth})")
+            title = f"{_METHOD_LABELS.get(mode, mode)} — {SIDE_LABELS[side]}"
             _draw_rep_tree(ax, G, root, pos, nleaves, color, title)
+            if G and G.number_of_nodes() > 0:
+                ax.text(0.01, 0.99, panel, transform=ax.transAxes,
+                        fontweight="bold", fontsize=9, va="top")
 
-        fig.suptitle(
-            f"Opening Repertoire — {_METHOD_LABELS.get(mode, mode)}\n"
-            f"■ Your moves   □ Opponent moves",
-            fontsize=11, y=1.01,
-        )
         fig.tight_layout()
         out = os.path.join(results_dir, f"repertoire_graph_{mode}.png")
-        fig.savefig(out, dpi=180, bbox_inches="tight")
+        fig.savefig(out, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        print(f"  saved -> {out}")
+
+
+def plot_sankey_repertoire(
+    runs: list[dict],
+    results_dir: str,
+    data_dir: str = "data",
+    max_depth: int = 5,
+) -> None:
+    """Sankey-style repertoire flow diagram.
+
+    Columns = ply depth (left → right).  Filled cubic-bezier bands carry the
+    move-line flow; bands taper and fan at branch points exactly like a Sankey.
+    Your committed moves are drawn in the method colour; opponent responses in
+    warm grey.  One PNG per GA method, White repertoire left / Black right.
+    """
+    from matplotlib.path import Path
+    from matplotlib.patches import PathPatch
+    import matplotlib.patches as mpatches
+
+    gpath = os.path.join(data_dir, "graph_train.pkl")
+    if not os.path.exists(gpath):
+        print("  [skip] graph_train.pkl not found — skipping Sankey repertoire.")
+        return
+    with open(gpath, "rb") as fh:
+        graph = pickle.load(fh)
+
+    g_nodes  = graph["nodes"]
+    root_fen = graph["root_fen"]
+
+    # ── Tree node ─────────────────────────────────────────────────────────────
+
+    class _T:
+        __slots__ = ("fen", "san", "ply", "yours", "children", "y", "nl")
+        def __init__(self, fen, san, ply, yours):
+            self.fen = fen; self.san = san
+            self.ply = ply; self.yours = yours
+            self.children: list = []
+            self.y = 0.0; self.nl = 1
+
+    # ── Tree builder ──────────────────────────────────────────────────────────
+
+    def _build(committed: dict, reached: set, side: str) -> _T:
+        def _mine(fen: str) -> bool:
+            nd = g_nodes.get(fen)
+            return nd is not None and nd["turn"] == side
+
+        def _dfs(fen: str, ply: int, seen: frozenset) -> list:
+            if fen in seen or ply > max_depth:
+                return []
+            seen = seen | {fen}
+            nd = g_nodes.get(fen)
+            if nd is None:
+                return []
+            if _mine(fen):
+                uci = committed.get(fen)
+                if not uci:
+                    return []
+                ci = nd["children"].get(uci)
+                if not ci or ci["child_fen"] not in reached:
+                    return []
+                t = _T(ci["child_fen"], ci["move_san"], ply + 1, True)
+                t.children = _dfs(ci["child_fen"], ply + 1, seen)
+                return [t]
+            else:
+                kids = []
+                for _, ci in sorted(nd["children"].items(),
+                                    key=lambda kv: kv[1]["move_san"]):
+                    if ci["child_fen"] not in reached:
+                        continue
+                    t = _T(ci["child_fen"], ci["move_san"], ply + 1, False)
+                    t.children = _dfs(ci["child_fen"], ply + 1, seen)
+                    kids.append(t)
+                return kids
+
+        root = _T(root_fen, "", 0, False)
+        root.children = _dfs(root_fen, 0, frozenset())
+        return root
+
+    # ── Layout helpers ────────────────────────────────────────────────────────
+
+    def _count(node: _T) -> int:
+        if not node.children:
+            node.nl = 1; return 1
+        node.nl = sum(_count(c) for c in node.children)
+        return node.nl
+
+    def _assign_y(node: _T, ctr) -> None:
+        if not node.children:
+            node.y = next(ctr); return
+        for c in node.children:
+            _assign_y(c, ctr)
+        node.y = (node.children[0].y + node.children[-1].y) / 2.0
+
+    def _walk(node: _T):
+        yield node
+        for c in node.children:
+            yield from _walk(c)
+
+    # ── Filled cubic-bezier band ──────────────────────────────────────────────
+
+    def _bezier_band(ax, x0, y0, x1, y1, h, color, alpha=0.62):
+        """Draw a filled tapered bezier band from (x0,y0) to (x1,y1) of height h."""
+        mx = (x0 + x1) / 2.0
+        h2 = h / 2.0
+        # Bottom edge left→right, top edge right→left, closed.
+        verts = [
+            (x0, y0 - h2),
+            (mx, y0 - h2), (mx, y1 - h2), (x1, y1 - h2),  # CURVE4
+            (x1, y1 + h2),                                   # LINETO
+            (mx, y1 + h2), (mx, y0 + h2), (x0, y0 + h2),  # CURVE4 back
+            (x0, y0 - h2),                                   # CLOSEPOLY
+        ]
+        codes = [
+            Path.MOVETO,
+            Path.CURVE4, Path.CURVE4, Path.CURVE4,
+            Path.LINETO,
+            Path.CURVE4, Path.CURVE4, Path.CURVE4,
+            Path.CLOSEPOLY,
+        ]
+        ax.add_patch(PathPatch(
+            Path(verts, codes),
+            facecolor=color, edgecolor="none", alpha=alpha, zorder=1,
+        ))
+
+    # ── Panel renderer ────────────────────────────────────────────────────────
+
+    LEAF_H = 1.0    # y-units per leaf line
+    FILL   = 0.70   # fraction of leaf slot filled by the Sankey band
+    XS     = 3.0    # x-units between ply columns
+
+    YOUR_ALPHA = 0.68
+    OPP_ALPHA  = 0.38
+    OPP_COLOR  = "#BBBBBB"
+
+    def _render_panel(ax, root: _T, method_color: str) -> None:
+        if root.nl == 0:
+            ax.text(0.5, 0.5, "no data", transform=ax.transAxes,
+                    ha="center", va="center", color="#aaa", fontsize=9)
+            ax.axis("off")
+            return
+
+        # ── Bands ─────────────────────────────────────────────────────────────
+        def _draw_bands(node: _T) -> None:
+            x0  = node.ply * XS
+            h_p = node.nl * LEAF_H * FILL
+            off = -h_p / 2.0                          # stack from top of parent slot
+            for ch in node.children:
+                h_c    = ch.nl * LEAF_H * FILL
+                y_src  = node.y + off + h_c / 2.0    # centre of child's slice at parent
+                col    = method_color if ch.yours else OPP_COLOR
+                alp    = YOUR_ALPHA   if ch.yours else OPP_ALPHA
+                _bezier_band(ax, x0, y_src, ch.ply * XS, ch.y, h_c, col, alp)
+                off += h_c
+                _draw_bands(ch)
+
+        _draw_bands(root)
+
+        # ── Node labels ───────────────────────────────────────────────────────
+        fs = max(5.0, 8.5 - (max_depth - 3) * 0.4)
+        for nd in _walk(root):
+            if not nd.san:
+                continue
+            fc = method_color if nd.yours else "#6B6B6B"
+            tc = "white"      if nd.yours else "#EEEEEE"
+            ax.text(
+                nd.ply * XS, nd.y, nd.san,
+                ha="center", va="center",
+                fontsize=fs, fontweight="bold" if nd.yours else "normal",
+                color=tc,
+                bbox=dict(
+                    facecolor=fc, edgecolor="none", alpha=0.93,
+                    boxstyle="round,pad=0.22",
+                ),
+                zorder=4,
+            )
+
+        # ── Ply column markers ────────────────────────────────────────────────
+        y_bot = -0.85
+        for ply in range(max_depth + 1):
+            if ply == 0:
+                lbl = "start"
+            else:
+                mn  = (ply + 1) // 2
+                col = "W" if ply % 2 == 1 else "B"
+                lbl = f"{mn}.{col}"
+            ax.axvline(ply * XS, color="#DDDDDD", linewidth=0.5,
+                       ymin=0.03, ymax=0.97, zorder=0)
+            ax.text(ply * XS, y_bot, lbl,
+                    ha="center", va="top",
+                    fontsize=7.0, color="#AAAAAA", fontstyle="italic")
+
+        ax.set_xlim(-XS * 0.7, max_depth * XS + XS * 0.7)
+        ax.set_ylim(y_bot - 0.3, root.nl - 0.5 + 0.6)
+        ax.axis("off")
+
+    # ── Per-method output ─────────────────────────────────────────────────────
+
+    GA_MODES = ["COEVOLVE", "STATIC", "GREEDY_HILLCLIMB"]
+
+    for mode in GA_MODES:
+        mode_runs = [
+            r for r in runs
+            if r.get("mode") == mode
+            and r.get("config", {}).get("lambda_weight") == MAIN_LAMBDA
+        ]
+        if not mode_runs:
+            continue
+        best = max(mode_runs, key=lambda r: r.get("heldout_score", -float("inf")))
+        cand = best["final_best_candidate"]
+        mc   = _METHOD_COLORS.get(mode, "#333333")
+
+        # Pre-build both trees to size the figure
+        roots: dict[str, _T] = {}
+        for side in ("white", "black"):
+            r = _build(cand[f"{side}_committed"], set(cand[f"{side}_reached"]), side)
+            _count(r)
+            _assign_y(r, iter(np.arange(r.nl, dtype=float)))
+            roots[side] = r
+
+        max_nl = max(roots["white"].nl, roots["black"].nl, 1)
+        fig_h  = max(5.0, min(18.0, max_nl * 0.42))
+        fig_w  = max(16.0, (max_depth + 1) * 2.8)
+
+        fig, axes = plt.subplots(1, 2, figsize=(fig_w, fig_h),
+                                 facecolor="white")
+
+        for ax, side, panel in zip(axes, ("white", "black"), ("(a)", "(b)")):
+            _render_panel(ax, roots[side], mc)
+            ax.text(0.01, 0.99, panel,
+                    transform=ax.transAxes, fontweight="bold",
+                    fontsize=10, va="top")
+            # Side label below panel
+            side_lbl = "Playing as White" if side == "white" else "Playing as Black"
+            ax.text(0.5, -0.01, side_lbl,
+                    transform=ax.transAxes,
+                    ha="center", va="top", fontsize=9, color="#555555")
+
+        # Figure-level legend
+        legend_handles = [
+            mpatches.Patch(facecolor=mc,       alpha=0.85, label="Committed move (yours)"),
+            mpatches.Patch(facecolor=OPP_COLOR, alpha=0.65, label="Opponent response"),
+        ]
+        fig.legend(handles=legend_handles, loc="lower center",
+                   ncol=2, framealpha=0.9, fontsize=8.5,
+                   bbox_to_anchor=(0.5, 0.0))
+
+        fig.tight_layout(rect=[0, 0.05, 1, 1])
+        out = os.path.join(results_dir, f"repertoire_sankey_{mode}.png")
+        fig.savefig(out, dpi=300, bbox_inches="tight")
         plt.close(fig)
         print(f"  saved -> {out}")
 
@@ -1694,6 +1957,7 @@ def run_analysis(
     results_dir: str = "results",
 ) -> None:
     """Run the full analysis pipeline and write all outputs to results_dir."""
+    _paper_style()
     Path(results_dir).mkdir(parents=True, exist_ok=True)
 
     print(f"Loading runs from '{runs_dir}' ...")
@@ -1770,6 +2034,10 @@ def run_analysis(
 
     print("\nPlotting repertoire_graph_*.png ...")
     plot_repertoire_graphs(results_dir)
+
+    print("\nPlotting repertoire_sankey_*.png ...")
+    plot_sankey_repertoire(runs, results_dir)
+    print("  saved.")
 
     print(f"\nDone - results saved to '{results_dir}'.")
 
