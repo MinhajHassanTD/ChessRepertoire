@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.4.30)  30 APR 2026 04:40
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.4.30)  30 APR 2026 09:19
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -815,75 +815,76 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 
 
 ] [2] [3]
-<results_10/score_distributions.png, id=252, 858.5676pt x 315.8199pt>
+<results_10/score_distributions.png, id=256, 858.5676pt x 315.8199pt>
 File: results_10/score_distributions.png Graphic file (type png)
 <use results_10/score_distributions.png>
-Package pdftex.def Info: results_10/score_distributions.png  used on input line 483.
+Package pdftex.def Info: results_10/score_distributions.png  used on input line 492.
 (pdftex.def)             Requested size: 252.0pt x 92.69379pt.
-<results_25/score_distributions.png, id=254, 858.5676pt x 315.8199pt>
+<results_25/score_distributions.png, id=258, 858.5676pt x 315.8199pt>
 File: results_25/score_distributions.png Graphic file (type png)
 <use results_25/score_distributions.png>
-Package pdftex.def Info: results_25/score_distributions.png  used on input line 491.
+Package pdftex.def Info: results_25/score_distributions.png  used on input line 500.
 (pdftex.def)             Requested size: 252.0pt x 92.69379pt.
- [4 <./results_10/score_distributions.png>]
-<results_10/ga_vs_nonga.png, id=273, 858.0858pt x 315.8199pt>
+ [4]
+<results_10/ga_vs_nonga.png, id=275, 858.0858pt x 315.8199pt>
 File: results_10/ga_vs_nonga.png Graphic file (type png)
 <use results_10/ga_vs_nonga.png>
-Package pdftex.def Info: results_10/ga_vs_nonga.png  used on input line 562.
+Package pdftex.def Info: results_10/ga_vs_nonga.png  used on input line 571.
 (pdftex.def)             Requested size: 252.0pt x 92.7468pt.
-<results_25/ga_vs_nonga.png, id=274, 858.0858pt x 315.8199pt>
+<results_25/ga_vs_nonga.png, id=276, 858.0858pt x 315.8199pt>
 File: results_25/ga_vs_nonga.png Graphic file (type png)
 <use results_25/ga_vs_nonga.png>
-Package pdftex.def Info: results_25/ga_vs_nonga.png  used on input line 569.
+Package pdftex.def Info: results_25/ga_vs_nonga.png  used on input line 578.
 (pdftex.def)             Requested size: 252.0pt x 92.7468pt.
-<results_10/closure_ablation.png, id=277, 858.0858pt x 315.0972pt>
-File: results_10/closure_ablation.png Graphic file (type png)
-<use results_10/closure_ablation.png>
-Package pdftex.def Info: results_10/closure_ablation.png  used on input line 588.
-(pdftex.def)             Requested size: 252.0pt x 92.53456pt.
-<results_25/closure_ablation.png, id=278, 858.0858pt x 315.0972pt>
-File: results_25/closure_ablation.png Graphic file (type png)
-<use results_25/closure_ablation.png>
-Package pdftex.def Info: results_25/closure_ablation.png  used on input line 595.
-(pdftex.def)             Requested size: 252.0pt x 92.53456pt.
-<results_10/band_breakdown.png, id=282, 785.8158pt x 315.579pt>
-File: results_10/band_breakdown.png Graphic file (type png)
-<use results_10/band_breakdown.png>
-Package pdftex.def Info: results_10/band_breakdown.png  used on input line 650.
-(pdftex.def)             Requested size: 252.0pt x 101.1992pt.
-<results_25/band_breakdown.png, id=283, 785.8158pt x 315.579pt>
-File: results_25/band_breakdown.png Graphic file (type png)
-<use results_25/band_breakdown.png>
-Package pdftex.def Info: results_25/band_breakdown.png  used on input line 657.
-(pdftex.def)             Requested size: 252.0pt x 101.1992pt.
- [5 <./results_25/score_distributions.png> <./results_10/ga_vs_nonga.png> <./results_25/ga_vs_nonga.png> <./results_10/closure_ablation.png> <./results_25/closure_ablation.png>]
+
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
-<results_10/convergence.png, id=303, 496.7358pt x 279.6849pt>
+<results_10/closure_ablation.png, id=279, 858.0858pt x 315.0972pt>
+File: results_10/closure_ablation.png Graphic file (type png)
+<use results_10/closure_ablation.png>
+Package pdftex.def Info: results_10/closure_ablation.png  used on input line 597.
+(pdftex.def)             Requested size: 252.0pt x 92.53456pt.
+<results_25/closure_ablation.png, id=280, 858.0858pt x 315.0972pt>
+File: results_25/closure_ablation.png Graphic file (type png)
+<use results_25/closure_ablation.png>
+Package pdftex.def Info: results_25/closure_ablation.png  used on input line 604.
+(pdftex.def)             Requested size: 252.0pt x 92.53456pt.
+ [5 <./results_10/score_distributions.png> <./results_25/score_distributions.png> <./results_10/ga_vs_nonga.png> <./results_25/ga_vs_nonga.png> <./results_10/closure_ablation.png>]
+<results_10/band_breakdown.png, id=301, 785.8158pt x 315.579pt>
+File: results_10/band_breakdown.png Graphic file (type png)
+<use results_10/band_breakdown.png>
+Package pdftex.def Info: results_10/band_breakdown.png  used on input line 659.
+(pdftex.def)             Requested size: 252.0pt x 101.1992pt.
+<results_25/band_breakdown.png, id=302, 785.8158pt x 315.579pt>
+File: results_25/band_breakdown.png Graphic file (type png)
+<use results_25/band_breakdown.png>
+Package pdftex.def Info: results_25/band_breakdown.png  used on input line 666.
+(pdftex.def)             Requested size: 252.0pt x 101.1992pt.
+<results_10/convergence.png, id=306, 496.7358pt x 279.6849pt>
 File: results_10/convergence.png Graphic file (type png)
 <use results_10/convergence.png>
-Package pdftex.def Info: results_10/convergence.png  used on input line 675.
+Package pdftex.def Info: results_10/convergence.png  used on input line 684.
 (pdftex.def)             Requested size: 252.0pt x 141.8863pt.
-<results_25/convergence.png, id=304, 496.7358pt x 279.6849pt>
+ [6 <./results_25/closure_ablation.png> <./results_10/band_breakdown.png> <./results_25/band_breakdown.png>]
+<results_25/convergence.png, id=317, 496.7358pt x 279.6849pt>
 File: results_25/convergence.png Graphic file (type png)
 <use results_25/convergence.png>
-Package pdftex.def Info: results_25/convergence.png  used on input line 683.
+Package pdftex.def Info: results_25/convergence.png  used on input line 692.
 (pdftex.def)             Requested size: 252.0pt x 141.8863pt.
-<results_10/coevolve_dynamics.png, id=309, 1001.9031pt x 279.444pt>
+<results_10/coevolve_dynamics.png, id=322, 1001.9031pt x 279.444pt>
 File: results_10/coevolve_dynamics.png Graphic file (type png)
 <use results_10/coevolve_dynamics.png>
-Package pdftex.def Info: results_10/coevolve_dynamics.png  used on input line 704.
+Package pdftex.def Info: results_10/coevolve_dynamics.png  used on input line 713.
 (pdftex.def)             Requested size: 252.0pt x 70.28296pt.
-<results_25/coevolve_dynamics.png, id=310, 1001.9031pt x 279.444pt>
+<results_25/coevolve_dynamics.png, id=323, 1001.9031pt x 279.444pt>
 File: results_25/coevolve_dynamics.png Graphic file (type png)
 <use results_25/coevolve_dynamics.png>
-Package pdftex.def Info: results_25/coevolve_dynamics.png  used on input line 712.
+Package pdftex.def Info: results_25/coevolve_dynamics.png  used on input line 721.
 (pdftex.def)             Requested size: 252.0pt x 70.28296pt.
- [6 <./results_10/band_breakdown.png> <./results_25/band_breakdown.png>]
 <results_10/repertoire_sankey_COEVOLVE.png, id=328, 1210.7634pt x 362.3136pt>
 File: results_10/repertoire_sankey_COEVOLVE.png Graphic file (type png)
 <use results_10/repertoire_sankey_COEVOLVE.png>
-Package pdftex.def Info: results_10/repertoire_sankey_COEVOLVE.png  used on input line 736.
+Package pdftex.def Info: results_10/repertoire_sankey_COEVOLVE.png  used on input line 745.
 (pdftex.def)             Requested size: 516.0pt x 154.4097pt.
  [7 <./results_10/convergence.png> <./results_25/convergence.png> <./results_10/coevolve_dynamics.png> <./results_25/coevolve_dynamics.png>] [8 <./results_10/repertoire_sankey_COEVOLVE.png>] (main.bbl)
 
@@ -897,28 +898,26 @@ Before submitting the final camera ready copy, remember to:
  uses only Type 1 fonts and that every step in the generation
  process uses the appropriate paper size.
 
-[9
-
-] (main.aux)
+[9] (main.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2025-12-24>
  ***********
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: 540E9CBADE5B73F208FAE120A34303E6;8452.
+(rerunfilecheck)             Checksum: C56FCC91BF91322B73DEE9656AB1ED5C;8671.
  ) 
 Here is how much of TeX's memory you used:
- 27289 strings out of 467871
- 571345 string characters out of 5419828
- 942925 words of memory out of 5000000
- 55645 multiletter control sequences out of 15000+600000
+ 27291 strings out of 467871
+ 571375 string characters out of 5419828
+ 940926 words of memory out of 5000000
+ 55646 multiletter control sequences out of 15000+600000
  681211 words of font info for 141 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  84i,12n,94p,1633b,1105s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmex10.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi10.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi5.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi6.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi7.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi8.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi9.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmib10.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr10.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr6.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr7.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr8.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr9.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy5.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy6.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy7.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy8.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy9.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msam10.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/urw/courier/ucrr8a.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmb8a.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmbi8a.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmr8a.pfb><C:/Users/Hp/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmri8a.pfb>
-Output written on main.pdf (9 pages, 3060208 bytes).
+Output written on main.pdf (9 pages, 3062004 bytes).
 PDF statistics:
- 478 PDF objects out of 1000 (max. 8388607)
- 94 named destinations out of 1000 (max. 500000)
- 446 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 482 PDF objects out of 1000 (max. 8388607)
+ 95 named destinations out of 1000 (max. 500000)
+ 454 words of extra memory for PDF output out of 10000 (max. 10000000)
 

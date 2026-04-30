@@ -433,6 +433,15 @@ method~B on every seed, and 0.0 means the reverse.
   \end{tabular}
 \end{table}
 
+The two budget levels correspond to qualitatively different repertoires suited to different player profiles.
+ At $B = 10$, the best repertoires span 63 total positions across both colors, committing to 20 moves with
+  lines typically extending 3--4 ply a compact, learnable set appropriate for players new to opening theory
+   who want coherent first responses without deep memorization. At $B = 25$, the repertoire grows to 124 total
+    positions with 45 committed moves, lines regularly reaching 5--6 ply into named systems such as the Caro-Kann
+     and Queen's Gambit Declined. This depth suits players already familiar with opening principles who are building
+      tournament-ready preparation. Testing both budgets lets us examine whether optimization methods scale consistently
+       across the memorization demands of casual and experienced players.
+
 % =========================================================================
 \section{Results}
 
@@ -868,6 +877,9 @@ separate ``human exploits at this rating'' from ``is objectively stronger,'' cla
 
 \subsection{Joint White--Black Co-Evolution}
 A single candidate co-evolving its White and Black repertoires simultaneously against a shared opponent population could discover synergistic opening choices across colors, rather than optimizing each side independently.
+
+\subsection{Real-Game Tournament Validation}
+All evaluation in this work is simulation-based, relying on historical win rates from the Lichess database. A natural extension is to test generated repertoires in live or correspondence play against human opponents. The two budget conditions map naturally to different player populations: $B = 10$ repertoires (20 moves, 3--4 ply) suit club-level players for whom memorization depth is a genuine constraint, while $B = 25$ repertoires (45 moves, 5--6 ply) are better evaluated against tournament players already comfortable with structured preparation. Real game outcomes would provide external validity that held-out win rates alone cannot, testing whether simulation-based gains translate to practice.
 % =========================================================================
 \section*{Acknowledgment}
 
