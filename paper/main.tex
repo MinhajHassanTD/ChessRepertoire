@@ -838,11 +838,7 @@ individually more expensive, and 100 generations may not be sufficient for
 full convergence at that scale.
 
 \subsection{Limitations}
-The position graph covers only 10~ply, while real games regularly extend
-deeper. The opponent model aggregates all players within a rating band into
-a single mixture, ignoring individual style variation. The evaluation metric, an empirical-Bayes win rate from historical games, may not fully capture
-move value when an opponent knows they face a prepared repertoire. These gaps
-point directly to the most promising areas for future work.
+The position graph covers only 10~ply, while serious opening preparation regularly extends well beyond this depth. The opponent model collapses all players within a rating band into a single mixture over a 2-simplex, discarding individual style variation and leaving insufficient adversarial diversity for co-evolution to exploit. The evaluation metric relies on historical win rates from Lichess games, which may misrepresent the objective value of rare moves that a chess engine such as Stockfish would correctly penalise. Finally, the finding that $B = 10$ slightly outperforms $B = 25$ leaves the scaling behaviour of the approach uncertain: it is unclear whether a larger budget with more generations would reverse this ordering or whether the fitness landscape becomes harder to navigate as tree depth increases.
 
 
 \section{Conclusion}
