@@ -1,6 +1,6 @@
-PWD c:\Users\Hp\Minhaj\Habib University\Semester - 6\Computational Intelligence\ChessRepertoire\paper
+PWD C:\Users\Hp\Minhaj\Habib University\Semester - 6\Computational Intelligence\ChessRepertoire\paper
 INPUT C:\Users\Hp\AppData\Local\MiKTeX\miktex\data\le\pdftex\pdflatex.fmt
-INPUT c:\Users\Hp\Minhaj\Habib University\Semester - 6\Computational Intelligence\ChessRepertoire\paper\main.tex
+INPUT main.tex
 OUTPUT main.log
 INPUT C:\Users\Hp\AppData\Local\Programs\MiKTeX\tex\latex\ieeetran\IEEEtran.cls
 INPUT C:\Users\Hp\AppData\Local\Programs\MiKTeX\tex\latex\ieeetran\IEEEtran.cls

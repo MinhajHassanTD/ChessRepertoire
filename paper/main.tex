@@ -26,10 +26,10 @@
 \title{Co-Evolutionary Genetic Algorithms for Memorization-Constrained Robust Chess Opening Repertoires}
 
 \author{
-    \IEEEauthorblockN{Hazeera Muhammad Hashim, Minhaj ul Hassan, and Zainab Zahid}
-    \IEEEauthorblockA{\textit{Department of Computer Science, Habib University}}
+    \IEEEauthorblockN{Minhaj ul Hassan, Hazeera Muhammad Hashim, and Zainab Zahid}
+    \IEEEauthorblockA{\textit{Department of Computer Science, Habib University} \\
     Karachi, Pakistan \\
-    \texttt{\{hm09247, mu08984, zz08969\}@std.habib.edu.pk}
+    \texttt{\{mu08984, hm09247, zz08969\}@st.habib.edu.pk}}
 }
 
 \maketitle
@@ -187,7 +187,7 @@ Once a repertoire is built, we score it by walking through the strategy tree pos
 \end{itemize}
 This gives a single expected score for the repertoire against a given rating band. We do this separately for the white and black repertoires, then combine them into one number: the white repertoire's score plus the black repertoire's score averaged.
 
-A good repertoire must hold up against all skill levels, not just one. Given an opponent mixture $\boldsymbol{\pi} \in \{\pi_1, \pi_2, \pi_3 \}$ over the three rating bands, the fitness is:
+A good repertoire must hold up against all skill levels, not just one. Given an opponent mixture $\boldsymbol{\pi} = (\pi_1, \pi_2, \pi_3)$ over the three rating bands, the fitness is:
 \begin{equation}
 F(\mathcal{R}) = \sum_{i=1}^{3} \pi_i \cdot s_{b_i}(\mathcal{R}) + \lambda \cdot \min_i ( s_{b_i}(\mathcal{R})),
 \end{equation}
@@ -327,7 +327,7 @@ run, under a uniform opponent mixture.
 \end{figure}
 
 Fig.~\ref{fig:arch} shows the overall system architecture. The pipeline
-comprises of two phases: Data Preprocessing and GA Optimization.
+consists of two phases: Data Preprocessing and GA Optimization.
 
 \subsection{Repertoire Chromosome and Initialization}
 
