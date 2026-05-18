@@ -1,5 +1,8 @@
 # Co-Evolutionary Genetic Algorithms for Chess Opening Repertoires
 
+[![tests](https://github.com/MinhajHassanTD/ChessRepertoire/actions/workflows/tests.yml/badge.svg)](https://github.com/MinhajHassanTD/ChessRepertoire/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **Full title:** Co-Evolutionary Genetic Algorithms for Memorization-Constrained Robust Chess Opening Repertoires
 
 Minhaj ul Hassan, Hazeera Muhammad Hashim, Zainab Zahid
@@ -76,13 +79,13 @@ ChessRepertoire/
 │   ├── coevolution.py       ← C8: main GA loop
 │   ├── experiments.py       ← C9: experiment matrix dispatch
 │   ├── analyze.py           ← C10: figures, tables, stats
-│   ├── data_compiler.py     ← merges per-shard L*.db crawls into snapshot.db
-│   └── clear.py             ← helper to wipe generated artifacts
+│   ├── data_compiler.py     ← snapshots results/ + runs/ + config.py into experiments/
+│   └── clear.py             ← wipes *.pkl files in runs/ so experiments can be rerun
 │
 ├── data/                    ← databases + pickled graphs / caches (gitignored)
 ├── runs/                    ← per-run result pickles (gitignored)
 ├── results/                 ← figures, tables, repertoire dumps
-├── experiments/             ← saved hyperparameter sweep configs
+├── experiments/             ← frozen hyperparameter-sweep snapshots ([README](experiments/README.md))
 ├── visualize/               ← standalone HTML visualizers (Sankey, 3D graph)
 ├── tests/                   ← pytest suite, one file per component
 └── paper/                   ← IEEE-conference LaTeX source + final figures
@@ -137,6 +140,10 @@ python src/analyze.py --appendix  # + appendix figures
 
 # Tests
 pytest tests/
+
+# Wipe runs/*.pkl so experiments rerun from scratch
+python -m src.clear            # deletes *.pkl in runs/
+python -m src.clear --all-files  # delete every file in runs/
 ```
 
 ---
@@ -190,6 +197,10 @@ Generated under `results/` (and copied per-budget into `paper/results_10/`, `pap
 A single `np.random.default_rng(seed)` is created per run and threaded through every component — no other random source is used. Given the same seed, runs are **bit-identical**. The result dict for each run includes the seed, full config, and the current git commit.
 
 ---
+
+## License
+
+[MIT](LICENSE) — free to use, modify, and distribute with attribution.
 
 ## Citation
 
