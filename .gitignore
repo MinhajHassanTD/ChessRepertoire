@@ -11,6 +11,12 @@ results/*.csv
 results/*.txt
 data/*.db
 data/*.pkl
+# Track the pickled artifacts needed to reproduce final results
+!data/base_policies.pkl
+!data/eval_cache_train.pkl
+!data/eval_cache_heldout.pkl
+!data/graph_train.pkl
+!data/graph_heldout.pkl
 
 # Claude internal
 .claude/
