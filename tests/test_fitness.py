@@ -51,9 +51,9 @@ def _make_toy_graph():
                 "score_raw": 0.52,
                 "turn": "white",
                 "band_stats": {
-                    "1600-1799": _band_stats(300, 156, 90, 54),
-                    "1800-1999": _band_stats(400, 208, 120, 72),
-                    "2000-2199": _band_stats(300, 156, 90, 54),
+                    "1000-1399": _band_stats(300, 156, 90, 54),
+                    "1400-1799": _band_stats(400, 208, 120, 72),
+                    "1800-2199": _band_stats(300, 156, 90, 54),
                 },
                 "children": {
                     "e2e4": {
@@ -61,9 +61,9 @@ def _make_toy_graph():
                         "move_san": "e4",
                         "aggregate_count": 700,
                         "band_counts": {
-                            "1600-1799": 200,
-                            "1800-1999": 280,
-                            "2000-2199": 220,
+                            "1000-1399": 200,
+                            "1400-1799": 280,
+                            "1800-2199": 220,
                         },
                     },
                     "d2d4": {
@@ -71,9 +71,9 @@ def _make_toy_graph():
                         "move_san": "d4",
                         "aggregate_count": 300,
                         "band_counts": {
-                            "1600-1799": 100,
-                            "1800-1999": 120,
-                            "2000-2199": 80,
+                            "1000-1399": 100,
+                            "1400-1799": 120,
+                            "1800-2199": 80,
                         },
                     },
                 },
@@ -85,9 +85,9 @@ def _make_toy_graph():
                 "score_raw": 0.51,
                 "turn": "black",
                 "band_stats": {
-                    "1600-1799": _band_stats(200, 102, 60, 38),
-                    "1800-1999": _band_stats(280, 143, 84, 53),
-                    "2000-2199": _band_stats(220, 112, 66, 42),
+                    "1000-1399": _band_stats(200, 102, 60, 38),
+                    "1400-1799": _band_stats(280, 143, 84, 53),
+                    "1800-2199": _band_stats(220, 112, 66, 42),
                 },
                 "children": {
                     "e7e5": {
@@ -95,9 +95,9 @@ def _make_toy_graph():
                         "move_san": "e5",
                         "aggregate_count": 420,
                         "band_counts": {
-                            "1600-1799": 120,
-                            "1800-1999": 168,
-                            "2000-2199": 132,
+                            "1000-1399": 120,
+                            "1400-1799": 168,
+                            "1800-2199": 132,
                         },
                     },
                     "c7c5": {
@@ -105,9 +105,9 @@ def _make_toy_graph():
                         "move_san": "c5",
                         "aggregate_count": 280,
                         "band_counts": {
-                            "1600-1799": 80,
-                            "1800-1999": 112,
-                            "2000-2199": 88,
+                            "1000-1399": 80,
+                            "1400-1799": 112,
+                            "1800-2199": 88,
                         },
                     },
                 },
@@ -119,9 +119,9 @@ def _make_toy_graph():
                 "score_raw": 0.50,
                 "turn": "white",
                 "band_stats": {
-                    "1600-1799": _band_stats(120, 60, 36, 24),
-                    "1800-1999": _band_stats(168, 84, 50, 34),
-                    "2000-2199": _band_stats(132, 66, 40, 26),
+                    "1000-1399": _band_stats(120, 60, 36, 24),
+                    "1400-1799": _band_stats(168, 84, 50, 34),
+                    "1800-2199": _band_stats(132, 66, 40, 26),
                 },
                 "children": {},
             },
@@ -132,9 +132,9 @@ def _make_toy_graph():
                 "score_raw": 0.53,
                 "turn": "white",
                 "band_stats": {
-                    "1600-1799": _band_stats(80, 42, 24, 14),
-                    "1800-1999": _band_stats(112, 59, 34, 19),
-                    "2000-2199": _band_stats(88, 47, 26, 15),
+                    "1000-1399": _band_stats(80, 42, 24, 14),
+                    "1400-1799": _band_stats(112, 59, 34, 19),
+                    "1800-2199": _band_stats(88, 47, 26, 15),
                 },
                 "children": {},
             },
@@ -146,9 +146,9 @@ def _make_toy_graph():
                 "score_raw": 0.52,
                 "turn": "black",
                 "band_stats": {
-                    "1600-1799": _band_stats(100, 52, 30, 18),
-                    "1800-1999": _band_stats(120, 62, 36, 22),
-                    "2000-2199": _band_stats(80, 42, 24, 14),
+                    "1000-1399": _band_stats(100, 52, 30, 18),
+                    "1400-1799": _band_stats(120, 62, 36, 22),
+                    "1800-2199": _band_stats(80, 42, 24, 14),
                 },
                 "children": {},
             },
@@ -397,10 +397,10 @@ class TestAC2FiniteFitnessForValidCandidate:
 class TestAC3OverBudgetIsInfNeg:
 
     def _over_budget_candidate(self, graph):
-        """Create a candidate where white has 21 committed nodes (over budget=20)."""
+        """Create a candidate where white has BUDGET+1 committed nodes."""
+        from src.config import BUDGET
         root = graph["root_fen"]
-        # Build a fake committed dict with 21 entries
-        fake_committed = {f"fake_fen_{i} w KQkq -": f"e2e{i}" for i in range(21)}
+        fake_committed = {f"fake_fen_{i} w KQkq -": f"e2e{i}" for i in range(BUDGET + 1)}
         fake_committed[root] = "e2e4"
         white_rep = Repertoire(
             color="white",
@@ -432,7 +432,8 @@ class TestAC3OverBudgetIsInfNeg:
         base_policies = _make_toy_base_policies(graph)
 
         # Black over budget
-        fake_committed = {f"fake_fen_{i} b KQkq -": f"e7e{i}" for i in range(21)}
+        from src.config import BUDGET
+        fake_committed = {f"fake_fen_{i} b KQkq -": f"e7e{i}" for i in range(BUDGET + 1)}
         black_rep = Repertoire(
             color="black",
             committed=fake_committed,
@@ -449,16 +450,16 @@ class TestAC3OverBudgetIsInfNeg:
         assert r["fitness"] == -float("inf")
 
     def test_exactly_at_budget_is_valid(self):
-        """20 committed nodes should NOT trigger the over-budget penalty."""
+        """Exactly BUDGET committed nodes should NOT trigger the over-budget penalty."""
+        from src.config import BUDGET
         graph, *_ = _make_toy_graph()
         eval_cache = _make_toy_eval_cache(graph)
         base_policies = _make_toy_base_policies(graph)
 
         root = graph["root_fen"]
-        # Exactly 20 committed nodes for white (including root with real move)
-        fake_committed = {f"fake_fen_{i} w KQkq -": "e2e4" for i in range(19)}
+        fake_committed = {f"fake_fen_{i} w KQkq -": "e2e4" for i in range(BUDGET - 1)}
         fake_committed[root] = "e2e4"
-        assert len(fake_committed) == 20
+        assert len(fake_committed) == BUDGET
 
         white_rep = Repertoire(
             color="white",

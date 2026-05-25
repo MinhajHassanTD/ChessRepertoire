@@ -13,6 +13,13 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
+    env:
+      # The runner needs an API token to import src.data_ingest, but the value
+      # never actually hits the network (all API calls are mocked in tests).
+      LICHESS_API_TOKEN: ci_placeholder_token
+      # Skip the experiments.py clean-tree gate; CI checkouts are always clean
+      # anyway and the tests that exercise the gate clear this var explicitly.
+      SKIP_GIT_CHECK: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -28,4 +35,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run pytest
-        run: pytest tests/ -v
+        # Tests that need data/snapshot.db (full Lichess crawl, ~hours) skip
+        # automatically via pytest.mark.skipif. The .pkl artifacts committed
+        # under data/ are sufficient for the rest of the suite.
+        run: pytest tests/ -v --tb=short

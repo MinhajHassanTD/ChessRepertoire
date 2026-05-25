@@ -64,7 +64,7 @@ def _make_graph():
             "turn": turn,
             "band_stats": {
                 b: {"games": 100, "wins": 30, "draws": 20, "losses": 50}
-                for b in ("1600-1799", "1800-1999", "2000-2199")
+                for b in ("1000-1399", "1400-1799", "1800-2199")
             },
             "children": children,
         }
@@ -74,7 +74,7 @@ def _make_graph():
             "child_fen": child_fen,
             "move_san": "?",
             "aggregate_count": agg_count,
-            "band_counts": {b: agg_count for b in ("1600-1799", "1800-1999", "2000-2199")},
+            "band_counts": {b: agg_count for b in ("1000-1399", "1400-1799", "1800-2199")},
         }
 
     root = STARTING_FEN

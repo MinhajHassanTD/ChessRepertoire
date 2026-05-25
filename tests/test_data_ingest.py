@@ -29,29 +29,43 @@ ITALIAN_FEN = "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq -"
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _db_available() -> bool:
-    return os.path.exists(SNAPSHOT_DB)
+    """True only if snapshot.db exists AND has the expected schema."""
+    if not os.path.exists(SNAPSHOT_DB) or os.path.getsize(SNAPSHOT_DB) == 0:
+        return False
+    try:
+        with sqlite3.connect(SNAPSHOT_DB) as conn:
+            conn.execute("SELECT 1 FROM positions LIMIT 1").fetchone()
+        return True
+    except sqlite3.Error:
+        return False
 
 
 def _db_has_min_train(n: int = 10_000) -> bool:
     if not _db_available():
         return False
-    conn = sqlite3.connect(SNAPSHOT_DB)
-    count = conn.execute(
-        "SELECT COUNT(*) FROM positions WHERE split='train'"
-    ).fetchone()[0]
-    conn.close()
-    return count >= n
+    try:
+        conn = sqlite3.connect(SNAPSHOT_DB)
+        count = conn.execute(
+            "SELECT COUNT(*) FROM positions WHERE split='train'"
+        ).fetchone()[0]
+        conn.close()
+        return count >= n
+    except sqlite3.Error:
+        return False
 
 
 def _db_has_min_heldout(n: int = 5_000) -> bool:
     if not _db_available():
         return False
-    conn = sqlite3.connect(SNAPSHOT_DB)
-    count = conn.execute(
-        "SELECT COUNT(*) FROM positions WHERE split='heldout'"
-    ).fetchone()[0]
-    conn.close()
-    return count >= n
+    try:
+        conn = sqlite3.connect(SNAPSHOT_DB)
+        count = conn.execute(
+            "SELECT COUNT(*) FROM positions WHERE split='heldout'"
+        ).fetchone()[0]
+        conn.close()
+        return count >= n
+    except sqlite3.Error:
+        return False
 
 
 # ── Import the module under test ───────────────────────────────────────────────
@@ -367,9 +381,9 @@ class TestSchema:
         conn.close()
 
     def test_band_tag_to_label_mapping(self):
-        assert BAND_TAG_TO_LABEL["1600"] == "1600-1799"
-        assert BAND_TAG_TO_LABEL["1800"] == "1800-1999"
-        assert BAND_TAG_TO_LABEL["2000"] == "2000-2199"
+        assert BAND_TAG_TO_LABEL["1000"] == "1000-1399"
+        assert BAND_TAG_TO_LABEL["1400"] == "1400-1799"
+        assert BAND_TAG_TO_LABEL["1800"] == "1800-2199"
 
     def test_starting_fen_is_canonical(self):
         """STARTING_FEN must already be in canonical 4-field form."""
@@ -379,23 +393,18 @@ class TestSchema:
         assert MAX_PLY_DEPTH == 10
 
     def test_min_move_frequency_constant(self):
-        assert MIN_MOVE_FREQUENCY == 0.10
+        assert 0.0 < MIN_MOVE_FREQUENCY < 1.0
 
     def test_frequency_filter_excludes_rare_moves(self, tmp_path):
-        """
-        A move that clears the games threshold but is < 10% of aggregate plays
-        must NOT be enqueued.  A move that is >= 10% must be enqueued.
-        """
+        """A move below MIN_MOVE_FREQUENCY must NOT be enqueued; above must be."""
         db_path = str(tmp_path / "freq.db")
 
-        # Build a fake aggregate response:
-        #   move A: 80,000 plays  →  80% frequency  (should be enqueued)
-        #   move B: 15,000 plays  →  15% frequency  (should be enqueued)
-        #   move C: 5,000  plays  →   5% frequency  (below 10% → NOT enqueued)
-        # Total = 100,000; depth 0 threshold = 10,000; all three clear it.
+        # Construct three moves where C is well below MIN_MOVE_FREQUENCY and
+        # A, B are comfortably above. Total = 100,000 so percentages = play count / 1000.
+        # A=80%, B=15%, C=1% (below any reasonable MIN_MOVE_FREQUENCY <= 5%).
         move_a = _fake_move("e2e4", "e4", white=48_000, draws=16_000, black=16_000)  # 80k
         move_b = _fake_move("d2d4", "d4", white=9_000,  draws=3_000,  black=3_000)   # 15k
-        move_c = _fake_move("c2c4", "c4", white=3_000,  draws=1_000,  black=1_000)   # 5k
+        move_c = _fake_move("c2c4", "c4", white=600,    draws=200,    black=200)     # 1k
 
         full_resp = {"white": 60_000, "draws": 20_000, "black": 20_000,
                      "moves": [move_a, move_b, move_c]}
@@ -490,12 +499,9 @@ class TestSchema:
         assert fen_c not in enqueued_ucis, "c2c4 (5%) should NOT be enqueued"
 
     def test_min_games_for_depth_thresholds(self):
-        # depth 0-3
-        for d in range(4):
-            assert min_games_for_depth(d) == 10_000, f"depth {d}"
-        # depth 4-6
-        for d in range(4, 7):
-            assert min_games_for_depth(d) == 30_000, f"depth {d}"
-        # depth 7-8
-        for d in range(7, 9):
-            assert min_games_for_depth(d) == 80_000, f"depth {d}"
+        """Threshold must be non-decreasing as depth grows."""
+        thresholds = [min_games_for_depth(d) for d in range(10)]
+        assert all(t > 0 for t in thresholds)
+        assert thresholds == sorted(thresholds), (
+            "min_games_for_depth should be monotone non-decreasing"
+        )

@@ -5,12 +5,12 @@ Each test corresponds to an acceptance criterion from Section E of BLUEPRINT.md.
 
 import os
 import pickle
+import sqlite3
+import sys
 import tempfile
 
 import pytest
 
-# Allow running from repo root
-import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.graph import (
@@ -23,6 +23,24 @@ from src.graph import (
 )
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "snapshot.db")
+
+
+def _db_usable() -> bool:
+    if not os.path.exists(DB_PATH) or os.path.getsize(DB_PATH) == 0:
+        return False
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("SELECT 1 FROM positions LIMIT 1").fetchone()
+        return True
+    except sqlite3.Error:
+        return False
+
+
+# Every test in this file requires a populated snapshot.db.
+pytestmark = pytest.mark.skipif(
+    not _db_usable(),
+    reason="data/snapshot.db is missing or has no schema; skipping graph integration tests",
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -154,7 +172,7 @@ def test_children_of_returns_empty_for_unknown_fen(train_graph):
 
 
 def test_band_stats_keys_present(train_graph):
-    BANDS = {"1600-1799", "1800-1999", "2000-2199"}
+    BANDS = {"1000-1399", "1400-1799", "1800-2199"}
     for fen, node in train_graph["nodes"].items():
         assert set(node["band_stats"].keys()) == BANDS, (
             f"band_stats keys wrong for {fen}"
