@@ -24,4 +24,7 @@ data/*.pkl
 # Raw databases (only snapshot.db is tracked)
 data/L*.db
 
+# Paper (kept local, not tracked remotely)
+paper/
+
 # Untracked local files
